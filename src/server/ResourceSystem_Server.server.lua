@@ -123,7 +123,7 @@ local RESOURCE_NODES = {
 		ToolBonus = "Axe", ToolDamage = 2,
 		Drops = {
 			{ Type = "carry", CarryItem = "Log", Min = 1, Max = 1 },
-			{ Type = "inventory", Item = "Sticks", Min = 1, Max = 3 },
+			{ Type = "inventory", Item = "Sticks", Min = 1, Max = 2 },
 		},
 		DropsSapling = true, NoRespawn = true,
 	},
