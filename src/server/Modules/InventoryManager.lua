@@ -168,15 +168,29 @@ function InventoryManager.DropItem(player, slotIndex, count)
 end
 
 function InventoryManager.CreateWorldPickup(itemName, count, position)
-	local itemData = ItemConfig.GetItem(itemName); if not itemData then return end
+	local itemData = ItemConfig.GetItem(itemName)
+	if not itemData then return end
+
 	local pickupsFolder = workspace:FindFirstChild("Pickups")
-	if not pickupsFolder then pickupsFolder = Instance.new("Folder"); pickupsFolder.Name = "Pickups"; pickupsFolder.Parent = workspace end
+	if not pickupsFolder then
+		pickupsFolder = Instance.new("Folder")
+		pickupsFolder.Name = "Pickups"
+		pickupsFolder.Parent = workspace
+	end
+
+	-- Try to find a custom model in ReplicatedStorage > Models > HeldItems
 	local pickup = nil
 	local modelsFolder = ReplicatedStorage:FindFirstChild("Models")
 	if modelsFolder then
 		local heldItems = modelsFolder:FindFirstChild("HeldItems")
 		if heldItems then
 			local template = heldItems:FindFirstChild(itemName)
+			if not template then
+				-- Try common name overrides
+				local overrides = { Sticks = "Stick" }
+				local altName = overrides[itemName]
+				if altName then template = heldItems:FindFirstChild(altName) end
+			end
 			if template then
 				pickup = template:Clone()
 				pickup.Name = "Pickup_" .. itemName
@@ -204,11 +218,17 @@ function InventoryManager.CreateWorldPickup(itemName, count, position)
 			end
 		end
 	end
+
+	-- Fallback: generic block if no custom model found
 	if not pickup then
-		pickup = Instance.new("Part"); pickup.Name = "Pickup_" .. itemName
-		pickup.Size = Vector3.new(2, 2, 2); pickup.Position = position
-		pickup.Anchored = false; pickup.CanCollide = true
-		pickup.Material = Enum.Material.SmoothPlastic; pickup.Shape = Enum.PartType.Block
+		pickup = Instance.new("Part")
+		pickup.Name = "Pickup_" .. itemName
+		pickup.Size = Vector3.new(2, 2, 2)
+		pickup.Position = position
+		pickup.Anchored = false
+		pickup.CanCollide = true
+		pickup.Material = Enum.Material.SmoothPlastic
+		pickup.Shape = Enum.PartType.Block
 		if itemData.Category == "Resource" then pickup.Color = Color3.fromRGB(139, 105, 65)
 		elseif itemData.Category == "Food" then pickup.Color = Color3.fromRGB(120, 180, 80)
 		else pickup.Color = Color3.fromRGB(160, 160, 160) end
