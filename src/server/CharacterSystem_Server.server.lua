@@ -52,6 +52,10 @@ local function applyScale(player, age)
 		local billboard = head:FindFirstChild("LineageTag")
 		if billboard and billboard:IsA("BillboardGui") then
 			billboard.StudsOffset = Vector3.new(0, 2.5 / scale, 0)
+			local ageDisplay = billboard:FindFirstChild("AgeDisplay")
+			if ageDisplay and ageDisplay:IsA("NumberValue") then
+				ageDisplay.Value = age
+			end
 		end
 	end
 end
@@ -166,6 +170,14 @@ RunService.Heartbeat:Connect(function(dt)
 			statsPayload.Thirst = math.floor(data.Thirst); statsPayload.MaxThirst = data.MaxThirst
 		end
 		StatsUpdateEvent:FireClient(player, statsPayload)
+		local head = character:FindFirstChild("Head")
+		if head then
+			local billboard = head:FindFirstChild("LineageTag")
+			if billboard then
+				local ageDisplay = billboard:FindFirstChild("AgeDisplay")
+				if ageDisplay then ageDisplay.Value = data.Age end
+			end
+		end
 	end
 end)
 

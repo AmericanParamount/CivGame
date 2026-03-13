@@ -107,9 +107,14 @@ local function applyFullAppearance(player, appearance)
 	nameLabel.TextSize = 14; nameLabel.Font = Enum.Font.GothamBold; nameLabel.Parent = billboard
 	local lineageLabel = Instance.new("TextLabel"); lineageLabel.Size = UDim2.new(1, 0, 0.5, 0)
 	lineageLabel.Position = UDim2.new(0, 0, 0.5, 0); lineageLabel.BackgroundTransparency = 1
-	lineageLabel.Text = appearance.Lineage .. " · " .. appearance.Race
+	lineageLabel.Text = appearance.Lineage .. " · " .. AppearanceConfig.GetRace(appearance.Race).DisplayName
 	lineageLabel.TextColor3 = Color3.fromRGB(200, 190, 170); lineageLabel.TextStrokeTransparency = 0.7
 	lineageLabel.TextSize = 11; lineageLabel.Font = Enum.Font.Gotham; lineageLabel.Parent = billboard
+	local ageVal = Instance.new("NumberValue")
+	ageVal.Name = "AgeDisplay"; ageVal.Value = 5; ageVal.Parent = billboard
+	ageVal.Changed:Connect(function(newAge)
+		lineageLabel.Text = "Age " .. tostring(math.floor(newAge)) .. " · " .. appearance.Lineage .. " · " .. AppearanceConfig.GetRace(appearance.Race).DisplayName
+	end)
 	print(string.format("[APPEARANCE] %s | Race: %s | Lineage: %s | Gender: %s | Hair: %s", player.Name, appearance.Race, appearance.Lineage, appearance.Gender, appearance.HairStyle))
 end
 

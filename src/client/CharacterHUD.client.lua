@@ -1,6 +1,6 @@
 -- CharacterHUD LocalScript
 -- Location: StarterPlayerScripts > CharacterHUD
--- Parchment-themed HUD with custom image backgrounds.
+-- Unified bottom HUD panel with age label + stat icon row. Hotbar slots drawn by InventoryClient.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -13,93 +13,6 @@ local StatsUpdateEvent = Events:WaitForChild("StatsUpdate")
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
 
-local UI_ASSETS = {
-	TopInfoBar = "rbxassetid://101582090412308",
-}
-
-local ICONS = {
-	Age = "rbxassetid://73314400891073",
-}
-
-local COLORS = {
-	TextDark   = Color3.fromRGB(62, 48, 32),
-	TextMedium = Color3.fromRGB(100, 80, 55),
-	TextLight  = Color3.fromRGB(140, 120, 85),
-	Gold       = Color3.fromRGB(180, 145, 55),
-}
-
-local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "CharacterHUD"
-screenGui.ResetOnSpawn = false
-screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-screenGui.Parent = playerGui
-
--- =============================================
--- TOP INFO BAR — taller so circles show evenly
--- =============================================
-local topBar = Instance.new("ImageLabel")
-topBar.Name = "TopInfoBar"
-topBar.Size = UDim2.new(0, 520, 0, 52)  -- taller (was 44)
-topBar.Position = UDim2.new(0.5, -260, 0, 6)
-topBar.BackgroundTransparency = 1
-topBar.Image = UI_ASSETS.TopInfoBar
-topBar.ScaleType = Enum.ScaleType.Stretch
-topBar.Parent = screenGui
-
-local ageIcon = Instance.new("ImageLabel")
-ageIcon.Size = UDim2.new(0, 22, 0, 22)
-ageIcon.Position = UDim2.new(0, 18, 0.5, -11)
-ageIcon.BackgroundTransparency = 1
-ageIcon.Image = ICONS.Age
-ageIcon.Parent = topBar
-
-local ageLabel = Instance.new("TextLabel")
-ageLabel.Name = "AgeLabel"
-ageLabel.Size = UDim2.new(0, 85, 1, 0)
-ageLabel.Position = UDim2.new(0, 42, 0, 0)
-ageLabel.BackgroundTransparency = 1
-ageLabel.Text = "Age: 5"
-ageLabel.TextColor3 = COLORS.TextDark
-ageLabel.TextSize = 13; ageLabel.Font = Enum.Font.GothamBold
-ageLabel.TextXAlignment = Enum.TextXAlignment.Left
-ageLabel.Parent = topBar
-
-local raceLabel = Instance.new("TextLabel")
-raceLabel.Name = "RaceLabel"
-raceLabel.Size = UDim2.new(0, 90, 1, 0)
-raceLabel.Position = UDim2.new(0.25, 12, 0, 0)
-raceLabel.BackgroundTransparency = 1
-raceLabel.Text = "Unknown"
-raceLabel.TextColor3 = COLORS.TextMedium
-raceLabel.TextSize = 11; raceLabel.Font = Enum.Font.GothamBold
-raceLabel.TextXAlignment = Enum.TextXAlignment.Center
-raceLabel.Parent = topBar
-
-local lineageLabel = Instance.new("TextLabel")
-lineageLabel.Name = "LineageLabel"
-lineageLabel.Size = UDim2.new(0, 110, 1, 0)
-lineageLabel.Position = UDim2.new(0.5, 12, 0, 0)
-lineageLabel.BackgroundTransparency = 1
-lineageLabel.Text = "Unknown"
-lineageLabel.TextColor3 = COLORS.TextMedium
-lineageLabel.TextSize = 11; lineageLabel.Font = Enum.Font.Gotham
-lineageLabel.TextXAlignment = Enum.TextXAlignment.Center
-lineageLabel.Parent = topBar
-
-local stageLabel = Instance.new("TextLabel")
-stageLabel.Name = "StageLabel"
-stageLabel.Size = UDim2.new(0, 80, 1, 0)
-stageLabel.Position = UDim2.new(0.75, 12, 0, 0)
-stageLabel.BackgroundTransparency = 1
-stageLabel.Text = "Child"
-stageLabel.TextColor3 = COLORS.TextDark
-stageLabel.TextSize = 13; stageLabel.Font = Enum.Font.GothamBold
-stageLabel.TextXAlignment = Enum.TextXAlignment.Center
-stageLabel.Parent = topBar
-
--- =============================================
--- STAT BAR (unified horizontal icon bar)
--- =============================================
 local STAT_ICONS = {
 	HealthFull  = "rbxassetid://106591422612852",
 	HealthHalf  = "rbxassetid://82042308865605",
@@ -111,61 +24,109 @@ local STAT_ICONS = {
 	ThirstEmpty = "rbxassetid://123937704514273",
 }
 
-local ICON_SIZE       = 18
-local ICON_GAP        = 2
-local SECTION_ICONS   = 10
-local DIVIDER_WIDTH   = 1
-local BAR_PADDING_X   = 6
-local BAR_PADDING_Y   = 3
-local DIVIDER_MARGIN  = 8
-local BAR_BOTTOM_OFFSET = 108
+local HUD_PANEL_IMAGE = "rbxassetid://114604193327055"
+
+-- Sizing constants
+local ICON_SIZE      = 14
+local ICON_GAP       = 2
+local SECTION_ICONS  = 10
+local DIVIDER_WIDTH  = 1
+local DIVIDER_MARGIN = 6
+local AGE_WIDTH      = 28
+local BAR_PADDING_X  = 8
+local BAR_PADDING_Y  = 2
 
 local sectionWidth = SECTION_ICONS * ICON_SIZE + (SECTION_ICONS - 1) * ICON_GAP
-local totalWidth   = BAR_PADDING_X * 2 + sectionWidth * 3 + (DIVIDER_MARGIN * 2 + DIVIDER_WIDTH) * 2
-local barHeight    = ICON_SIZE + BAR_PADDING_Y * 2
+local totalIconRowWidth = BAR_PADDING_X + AGE_WIDTH
+	+ (DIVIDER_MARGIN * 2 + DIVIDER_WIDTH) + sectionWidth
+	+ (DIVIDER_MARGIN * 2 + DIVIDER_WIDTH) + sectionWidth
+	+ (DIVIDER_MARGIN * 2 + DIVIDER_WIDTH) + sectionWidth
+	+ BAR_PADDING_X
 
-local statBar = Instance.new("ImageLabel")
-statBar.Name = "StatBar"
-statBar.Size = UDim2.new(0, totalWidth, 0, barHeight)
-statBar.Position = UDim2.new(0.5, -totalWidth / 2, 1, -(BAR_BOTTOM_OFFSET + barHeight))
-statBar.BackgroundTransparency = 1
-statBar.Image = "rbxassetid://113413200023574"
-statBar.ScaleType = Enum.ScaleType.Stretch
-statBar.Parent = screenGui
+local STAT_ROW_HEIGHT      = ICON_SIZE + BAR_PADDING_Y * 2
+local SLOT_SIZE_NEW        = 40
+local SLOT_PADDING_NEW     = 4
+local GAP_BETWEEN_ROWS     = 4
+local PANEL_PADDING_TOP    = 6
+local PANEL_PADDING_BOTTOM = 6
+-- +16 accounts for keybind labels below slots
+local PANEL_HEIGHT = PANEL_PADDING_TOP + STAT_ROW_HEIGHT + GAP_BETWEEN_ROWS + SLOT_SIZE_NEW + 16 + PANEL_PADDING_BOTTOM
 
+local HOTBAR_SIZE_CONST = 9
+local PANEL_WIDTH = math.max(
+	totalIconRowWidth,
+	HOTBAR_SIZE_CONST * (SLOT_SIZE_NEW + SLOT_PADDING_NEW) - SLOT_PADDING_NEW + 20
+)
+
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "CharacterHUD"
+screenGui.ResetOnSpawn = false
+screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+screenGui.Parent = playerGui
+
+-- =============================================
+-- UNIFIED HUD PANEL
+-- =============================================
+local hudPanel = Instance.new("ImageLabel")
+hudPanel.Name = "HUDPanel"
+hudPanel.Image = HUD_PANEL_IMAGE
+hudPanel.ScaleType = Enum.ScaleType.Stretch
+hudPanel.BackgroundTransparency = 1
+hudPanel.Size = UDim2.new(0, PANEL_WIDTH, 0, PANEL_HEIGHT)
+hudPanel.Position = UDim2.new(0.5, -PANEL_WIDTH / 2, 1, -PANEL_HEIGHT - 4)
+hudPanel.Parent = screenGui
+
+-- Age label (just the number)
+local ageLabel = Instance.new("TextLabel")
+ageLabel.Name = "AgeLabel"
+ageLabel.Size = UDim2.new(0, AGE_WIDTH, 0, STAT_ROW_HEIGHT)
+ageLabel.Position = UDim2.new(0, BAR_PADDING_X, 0, PANEL_PADDING_TOP)
+ageLabel.BackgroundTransparency = 1
+ageLabel.Text = "5"
+ageLabel.TextColor3 = Color3.fromRGB(200, 170, 90)
+ageLabel.TextSize = 13
+ageLabel.Font = Enum.Font.GothamBold
+ageLabel.Parent = hudPanel
+
+-- =============================================
+-- STAT ICONS
+-- =============================================
 local healthIcons = {}
 local hungerIcons = {}
 local thirstIcons = {}
 
+local iconY = PANEL_PADDING_TOP + BAR_PADDING_Y
+
 local function makeIcon(xPos, tbl)
 	local icon = Instance.new("ImageLabel")
 	icon.Size = UDim2.new(0, ICON_SIZE, 0, ICON_SIZE)
-	icon.Position = UDim2.new(0, xPos, 0, BAR_PADDING_Y)
+	icon.Position = UDim2.new(0, xPos, 0, iconY)
 	icon.BackgroundTransparency = 1
 	icon.Image = ""
 	icon.ScaleType = Enum.ScaleType.Fit
 	icon:SetAttribute("BaseX", xPos)
-	icon:SetAttribute("BaseY", BAR_PADDING_Y)
-	icon.Parent = statBar
+	icon:SetAttribute("BaseY", iconY)
+	icon.Parent = hudPanel
 	tbl[#tbl + 1] = icon
 	return xPos + ICON_SIZE + ICON_GAP
 end
 
 local function makeDivider(xPos)
 	local div = Instance.new("Frame")
-	div.Size = UDim2.new(0, DIVIDER_WIDTH, 1, -6)
-	div.Position = UDim2.new(0, xPos + DIVIDER_MARGIN, 0, 3)
+	div.Size = UDim2.new(0, DIVIDER_WIDTH, 0, STAT_ROW_HEIGHT - 4)
+	div.Position = UDim2.new(0, xPos + DIVIDER_MARGIN, 0, PANEL_PADDING_TOP + 2)
 	div.BackgroundColor3 = Color3.fromRGB(120, 90, 50)
 	div.BackgroundTransparency = 0.5
 	div.BorderSizePixel = 0
-	div.Parent = statBar
+	div.Parent = hudPanel
 	return xPos + DIVIDER_MARGIN * 2 + DIVIDER_WIDTH
 end
 
 local function buildStatBar()
-	local x = BAR_PADDING_X
+	local x = BAR_PADDING_X + AGE_WIDTH
+	x = makeDivider(x)
 	for _ = 1, SECTION_ICONS do x = makeIcon(x, healthIcons) end
-	x = x - ICON_GAP  -- remove trailing gap before divider
+	x = x - ICON_GAP
 	x = makeDivider(x)
 	for _ = 1, SECTION_ICONS do x = makeIcon(x, hungerIcons) end
 	x = x - ICON_GAP
@@ -174,6 +135,16 @@ local function buildStatBar()
 end
 
 buildStatBar()
+
+-- =============================================
+-- SHARED HUD INFO (for InventoryClient positioning)
+-- =============================================
+local SharedHUDInfo = Instance.new("Folder")
+SharedHUDInfo.Name = "SharedHUDInfo"
+SharedHUDInfo.Parent = player
+local panelWidthVal = Instance.new("NumberValue"); panelWidthVal.Name = "PanelWidth"; panelWidthVal.Value = PANEL_WIDTH; panelWidthVal.Parent = SharedHUDInfo
+local panelHeightVal = Instance.new("NumberValue"); panelHeightVal.Name = "PanelHeight"; panelHeightVal.Value = PANEL_HEIGHT; panelHeightVal.Parent = SharedHUDInfo
+local slotYVal = Instance.new("NumberValue"); slotYVal.Name = "SlotStartY"; slotYVal.Value = PANEL_PADDING_TOP + STAT_ROW_HEIGHT + GAP_BETWEEN_ROWS; slotYVal.Parent = SharedHUDInfo
 
 -- =============================================
 -- ICON STATE LOGIC
@@ -249,11 +220,7 @@ end)
 -- UPDATE
 -- =============================================
 local function updateHUD(stats)
-	ageLabel.Text = "Age: " .. tostring(stats.Age)
-	if stats.Age < 16 then stageLabel.Text = "Child"
-	elseif stats.Age >= 55 then stageLabel.Text = "Elder"
-	else stageLabel.Text = "Adult" end
-	lineageLabel.Text = stats.Lineage or "Unknown"
+	ageLabel.Text = tostring(stats.Age)
 
 	latestHealth    = stats.Health
 	latestMaxHealth = stats.MaxHealth

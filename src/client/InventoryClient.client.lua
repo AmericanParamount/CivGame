@@ -37,9 +37,9 @@ local THEME = {
 }
 
 local HOTBAR_SIZE = 9
-local TOTAL_SLOTS = 24
-local SLOT_SIZE = 52
-local SLOT_PADDING = 8
+local TOTAL_SLOTS = 27
+local SLOT_SIZE = 40
+local SLOT_PADDING = 4
 
 local inventoryData = nil
 local selectedSlot = 0
@@ -55,8 +55,8 @@ local popUpTween = TweenInfo.new(0.18, Enum.EasingStyle.Back, Enum.EasingDirecti
 local popDownTween = TweenInfo.new(0.15, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
 
 -- Normal and selected positions (selected rises up by 10px and grows)
-local SELECTED_RISE = 10
-local SELECTED_GROW = 10  -- extra pixels on each side
+local SELECTED_RISE = 6
+local SELECTED_GROW = 6
 
 -- =============================================
 -- CREATE HOTBAR
@@ -71,21 +71,11 @@ local function createHotbar()
 	local totalWidth = HOTBAR_SIZE * (SLOT_SIZE + SLOT_PADDING) - SLOT_PADDING
 	local container = Instance.new("Frame")
 	container.Name = "HotbarContainer"
-	container.Size = UDim2.new(0, totalWidth + 20, 0, SLOT_SIZE + SELECTED_RISE + 30)
-	container.Position = UDim2.new(0.5, -(totalWidth + 20) / 2, 1, -(SLOT_SIZE + SELECTED_RISE + 38))
+	container.Size = UDim2.new(0, totalWidth + 12, 0, SLOT_SIZE + SELECTED_RISE + 22)
+	container.Position = UDim2.new(0.5, -(totalWidth + 12) / 2, 1, -(SLOT_SIZE + SELECTED_RISE + 22 + 10))
 	container.BackgroundTransparency = 1
 	container.BorderSizePixel = 0
 	container.Parent = hotbarGui
-
-	local hotbarBg = Instance.new("ImageLabel")
-	hotbarBg.Name = "HotbarBackground"
-	hotbarBg.Image = "rbxassetid://113413200023574"
-	hotbarBg.ScaleType = Enum.ScaleType.Stretch
-	hotbarBg.BackgroundTransparency = 1
-	hotbarBg.Size = UDim2.new(1, 10, 1, 10)
-	hotbarBg.Position = UDim2.new(0, -5, 0, -5)
-	hotbarBg.ZIndex = 0
-	hotbarBg.Parent = container
 
 	for i = 1, HOTBAR_SIZE do
 		local xPos = 10 + (i - 1) * (SLOT_SIZE + SLOT_PADDING)
@@ -151,7 +141,7 @@ local function createHotbar()
 		keyLabel.BackgroundTransparency = 1
 		keyLabel.Text = tostring(i)
 		keyLabel.TextColor3 = THEME.TextLight
-		keyLabel.TextSize = 10
+		keyLabel.TextSize = 9
 		keyLabel.Font = Enum.Font.GothamBold
 		keyLabel.Parent = container
 
