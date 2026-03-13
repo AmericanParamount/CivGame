@@ -86,52 +86,55 @@ local function attachHeldModel(itemName, category)
 		or character:FindFirstChild("RightHand")              -- R15
 	if not rightArm then return end
 
+	local offset = (category == "Tool") and HOLD_OFFSET_TOOL or HOLD_OFFSET_R6
+
 	-- Try custom model first
-	local heldPart = nil
 	local heldFolder = getHeldItemsFolder()
 	if heldFolder then
-		local customModel = heldFolder:FindFirstChild(itemName)
-		if customModel then
-			local clone = customModel:Clone()
+		local template = heldFolder:FindFirstChild(itemName)
+		if template then
+			local clone = template:Clone()
 			clone.Name = "HeldItemModel"
-			clone.Parent = workspace
-			-- Find primary part (or first BasePart)
-			local primary = clone:IsA("Model") and clone.PrimaryPart
-			if not primary then
-				for _, d in ipairs(clone:GetDescendants()) do
-					if d:IsA("BasePart") then primary = d; break end
+			if clone:IsA("Model") then
+				if not clone.PrimaryPart then
+					for _, p in ipairs(clone:GetDescendants()) do
+						if p:IsA("BasePart") then clone.PrimaryPart = p; break end
+					end
 				end
-			end
-			if clone:IsA("Model") then clone.PrimaryPart = primary end
-			for _, d in ipairs(clone:GetDescendants()) do
-				if d:IsA("BasePart") then
-					d.Anchored  = false
-					d.CanCollide = false
-					d.Massless  = true
+				for _, p in ipairs(clone:GetDescendants()) do
+					if p:IsA("BasePart") then p.Anchored = false; p.CanCollide = false; p.Massless = true end
 				end
+				clone.Parent = character
+				local motor = Instance.new("Motor6D")
+				motor.Name = "HeldItemMotor"
+				motor.Part0 = rightArm
+				motor.Part1 = clone.PrimaryPart
+				motor.C0 = offset
+				motor.C1 = CFrame.new()
+				motor.Parent = rightArm
+				currentHeldModel = clone
+				currentHeldItem = itemName
+				return
 			end
-			currentHeldModel = clone
-			heldPart = primary
 		end
 	end
 
-	-- Fall back to generated part
-	if not heldPart then
-		local part = buildDefaultPart(category or "Resource")
-		part.Parent = workspace
-		currentHeldModel = part
-		heldPart = part
-	end
+	-- Default: build a simple Part
+	local heldPart = buildDefaultPart(category or "Resource")
+	heldPart.Anchored = false
+	heldPart.CanCollide = false
+	heldPart.Massless = true
+	heldPart.Parent = character
 
-	-- Weld to right arm
-	local offset = (category == "Tool") and HOLD_OFFSET_TOOL or HOLD_OFFSET_R6
-	local weld = Instance.new("WeldConstraint")
-	weld.Part0 = rightArm
-	weld.Part1 = heldPart
-	weld.Parent = heldPart
-	-- Position the part at the offset in world space so the weld starts correctly
-	heldPart.CFrame = rightArm.CFrame * offset
+	local motor = Instance.new("Motor6D")
+	motor.Name = "HeldItemMotor"
+	motor.Part0 = rightArm
+	motor.Part1 = heldPart
+	motor.C0 = offset
+	motor.C1 = CFrame.new()
+	motor.Parent = rightArm
 
+	currentHeldModel = heldPart
 	currentHeldItem = itemName
 end
 
