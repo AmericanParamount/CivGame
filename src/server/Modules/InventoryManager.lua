@@ -27,7 +27,7 @@ end
 function InventoryManager.InitPlayer(player)
 	local slots = {}
 	for i = 1, TOTAL_SLOTS do slots[i] = { Name = "", Count = 0 } end
-	inventories[player.UserId] = { Slots = slots, SelectedSlot = 1 }
+	inventories[player.UserId] = { Slots = slots, SelectedSlot = 0 }
 	InventoryManager.SyncToClient(player)
 end
 
@@ -105,6 +105,7 @@ end
 
 function InventoryManager.GetSelectedItem(player)
 	local inv = inventories[player.UserId]; if not inv then return nil, 0 end
+	if inv.SelectedSlot < 1 then return nil, 0 end
 	local slot = inv.Slots[inv.SelectedSlot]
 	if slot and slot.Name ~= "" then return slot.Name, slot.Count end
 	return nil, 0
@@ -112,7 +113,7 @@ end
 
 function InventoryManager.SetSelectedSlot(player, slotIndex)
 	local inv = inventories[player.UserId]; if not inv then return end
-	if slotIndex < 1 or slotIndex > HOTBAR_SLOTS then return end
+	if slotIndex < 0 or slotIndex > HOTBAR_SLOTS then return end
 	inv.SelectedSlot = slotIndex; InventoryManager.SyncToClient(player)
 end
 

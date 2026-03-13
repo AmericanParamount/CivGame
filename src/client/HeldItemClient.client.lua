@@ -20,6 +20,10 @@ local player = Players.LocalPlayer
 local HOLD_OFFSET_R6   = CFrame.new(0, -1, 0)       -- offset from Right Arm center
 local HOLD_OFFSET_TOOL = CFrame.new(0, -1, -0.5)    -- tools extend slightly forward
 
+local MODEL_NAME_OVERRIDES = {
+	Sticks = "Stick",
+}
+
 local DEFAULT_SHAPES = {
 	Resource = {
 		Size     = Vector3.new(1, 0.3, 0.3),
@@ -58,9 +62,7 @@ local function destroyHeldModel()
 end
 
 local function getHeldItemsFolder()
-	local models = ReplicatedStorage:FindFirstChild("Models")
-	if not models then return nil end
-	return models:FindFirstChild("HeldItems")
+	return ReplicatedStorage:FindFirstChild("Models")
 end
 
 local function buildDefaultPart(category)
@@ -91,7 +93,8 @@ local function attachHeldModel(itemName, category)
 	-- Try custom model first
 	local heldFolder = getHeldItemsFolder()
 	if heldFolder then
-		local template = heldFolder:FindFirstChild(itemName)
+		local modelName = MODEL_NAME_OVERRIDES[itemName] or itemName
+		local template = heldFolder:FindFirstChild(modelName)
 		if template then
 			local clone = template:Clone()
 			clone.Name = "HeldItemModel"
