@@ -121,7 +121,10 @@ local RESOURCE_NODES = {
 	Tree = {
 		MaxHealth = 5, HitCooldown = 0.6, HandDamage = 1,
 		ToolBonus = "Axe", ToolDamage = 2,
-		Drops = { { Type = "carry", CarryItem = "Log", Min = 1, Max = 1 } },
+		Drops = {
+			{ Type = "carry", CarryItem = "Log", Min = 1, Max = 1 },
+			{ Type = "inventory", Item = "Sticks", Min = 1, Max = 3 },
+		},
 		DropsSapling = true, NoRespawn = true,
 	},
 	PlantedSapling = {

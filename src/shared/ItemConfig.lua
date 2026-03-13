@@ -46,6 +46,12 @@ ItemConfig.Items = {
 		MaxStack = 10,
 		Description = "A young tree sapling. Can be planted to grow a new tree.",
 	},
+	Sticks = {
+		DisplayName = "Sticks",
+		Category = "Resource",
+		MaxStack = 30,
+		Description = "Small branches, useful for kindling and crafting",
+	},
 	-- === FOOD ===
 	Berries = {
 		DisplayName = "Berries",
