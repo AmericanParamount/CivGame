@@ -24,7 +24,7 @@ local TREE_FOOTPRINTS = { [1] = Vector3.new(10,12,10), [2] = Vector3.new(12,14,1
 local DEFAULT_TREE_FOOTPRINT = Vector3.new(10,12,10)
 
 local CARRY_ITEMS = {
-	Log = { DisplayName = "Log", SlowMultiplier = 0.6, HoldOffset = CFrame.new(0,3,0), DefaultSize = Vector3.new(2,2,6), DefaultColor = Color3.fromRGB(120,80,40), DefaultMaterial = Enum.Material.WoodPlanks, Plantable = false },
+	Log = { DisplayName = "Log", SlowMultiplier = 0.6, HoldOffset = CFrame.new(0, 3, 0) * CFrame.Angles(0, math.rad(90), 0), DefaultSize = Vector3.new(2,2,6), DefaultColor = Color3.fromRGB(120,80,40), DefaultMaterial = Enum.Material.WoodPlanks, Plantable = false },
 	Stone = { DisplayName = "Stone", SlowMultiplier = 0.5, HoldOffset = CFrame.new(0,2.5,0), DefaultSize = Vector3.new(3,2.5,3), DefaultColor = Color3.fromRGB(140,135,125), DefaultMaterial = Enum.Material.Slate, Plantable = false },
 	IronOre = { DisplayName = "Iron Ore", SlowMultiplier = 0.45, HoldOffset = CFrame.new(0,2.5,0), DefaultSize = Vector3.new(2.5,2,2.5), DefaultColor = Color3.fromRGB(120,85,60), DefaultMaterial = Enum.Material.Slate, Plantable = false },
 	CopperOre = { DisplayName = "Copper Ore", SlowMultiplier = 0.45, HoldOffset = CFrame.new(0,2.5,0), DefaultSize = Vector3.new(2.5,2,2.5), DefaultColor = Color3.fromRGB(140,110,70), DefaultMaterial = Enum.Material.Slate, Plantable = false },
@@ -161,7 +161,7 @@ local function dropCarriedItem(plr)
 	if not item or not item.Parent then carrying[plr.UserId] = nil; CarryStateEvent:FireClient(plr, false, nil, false, 0); return end
 	local character = plr.Character; local root = character and character:FindFirstChild("HumanoidRootPart")
 	local dropPos
-	if root then dropPos = root.Position + root.CFrame.LookVector * 4 + Vector3.new(0, 3, 0)
+	if root then dropPos = root.Position + root.CFrame.LookVector * 4 + Vector3.new(0, 0.5, 0)
 	else dropPos = item:IsA("BasePart") and item.Position or item:GetPivot().Position end
 	local mp = item:IsA("Model") and item.PrimaryPart or item
 	local weld = mp:FindFirstChild("CarryWeld"); if weld then weld:Destroy() end
@@ -274,8 +274,8 @@ PickupEvent.OnServerEvent:Connect(function(plr, targetItem)
 	local head = plr.Character:FindFirstChild("Head"); if not head then return end
 	local bb = targetItem:FindFirstChildOfClass("BillboardGui"); if bb then bb:Destroy() end
 	if targetItem:IsA("Model") then
-		for _, p in ipairs(targetItem:GetDescendants()) do if p:IsA("BasePart") then p.Anchored = false; p.CanCollide = false end end
-	elseif targetItem:IsA("BasePart") then targetItem.Anchored = false; targetItem.CanCollide = false end
+		for _, p in ipairs(targetItem:GetDescendants()) do if p:IsA("BasePart") then p.Anchored = false; p.CanCollide = false; p.Massless = true end end
+	elseif targetItem:IsA("BasePart") then targetItem.Anchored = false; targetItem.CanCollide = false; targetItem.Massless = true end
 	local mp = targetItem:IsA("Model") and targetItem.PrimaryPart or targetItem
 	mp.CFrame = head.CFrame * config.HoldOffset
 	local weld = Instance.new("WeldConstraint"); weld.Name = "CarryWeld"; weld.Part0 = head; weld.Part1 = mp; weld.Parent = mp

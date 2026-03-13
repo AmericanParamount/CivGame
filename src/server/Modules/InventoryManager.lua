@@ -160,7 +160,7 @@ function InventoryManager.DropItem(player, slotIndex, count)
 	if character then
 		local root = character:FindFirstChild("HumanoidRootPart")
 		if root then
-			local dropPos = root.Position + root.CFrame.LookVector * 5 + Vector3.new(0, 2, 0)
+			local dropPos = root.Position + root.CFrame.LookVector * 5 + Vector3.new(0, 0.5, 0)
 			InventoryManager.CreateWorldPickup(itemName, toDrop, dropPos)
 		end
 	end
@@ -270,7 +270,14 @@ PickupItemEvent.OnServerEvent:Connect(function(player, targetPickup)
 	local itemNameVal = targetPickup:FindFirstChild("ItemName")
 	local itemCountVal = targetPickup:FindFirstChild("ItemCount")
 	if not itemNameVal or not itemCountVal then return end
-	local pickupPos = targetPickup.Position
+	local pickupPos
+	if targetPickup:IsA("Model") then
+		pickupPos = targetPickup:GetPivot().Position
+	elseif targetPickup:IsA("BasePart") then
+		pickupPos = targetPickup.Position
+	else
+		return
+	end
 	if (root.Position - pickupPos).Magnitude > 10 then return end
 	local added = InventoryManager.AddItem(player, itemNameVal.Value, itemCountVal.Value)
 	if added > 0 then

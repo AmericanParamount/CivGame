@@ -488,8 +488,14 @@ local PICKUP_HOVER_RANGE = 12
 local function getMousePickup()
 	local target = mouse.Target
 	if not target then return nil end
-	if target:FindFirstChild("IsPickup") then return target end
-	if target.Parent and target.Parent:FindFirstChild("IsPickup") then return target.Parent end
+	local current = target
+	for i = 1, 5 do
+		if not current then return nil end
+		if current:FindFirstChild("IsPickup") and current:FindFirstChild("ItemName") then
+			return current
+		end
+		current = current.Parent
+	end
 	return nil
 end
 
@@ -499,7 +505,15 @@ RunService.RenderStepped:Connect(function()
 	if pickup and pickup:FindFirstChild("ItemName") then
 		local character = player.Character
 		if character and character:FindFirstChild("HumanoidRootPart") then
-			local dist = (character.HumanoidRootPart.Position - pickup.Position).Magnitude
+			local pickupPos
+		if pickup:IsA("Model") then
+			pickupPos = pickup:GetPivot().Position
+		elseif pickup:IsA("BasePart") then
+			pickupPos = pickup.Position
+		else
+			return
+		end
+		local dist = (character.HumanoidRootPart.Position - pickupPos).Magnitude
 			if dist <= PICKUP_HOVER_RANGE then
 				if hoveredPickup ~= pickup then
 					if currentHighlight then currentHighlight:Destroy() end

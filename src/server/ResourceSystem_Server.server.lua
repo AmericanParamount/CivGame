@@ -385,7 +385,7 @@ local function destroyNode(node, nodeType, config, player)
 			print(string.format("[GATHER] %s received %dx %s", player.Name, amount, drop.Item))
 		elseif drop.Type == "pickup" then
 			for p = 1, amount do
-				InventoryManager.CreateWorldPickup(drop.Item, 1, dropPos + Vector3.new(math.random(-3, 3), 1, math.random(-3, 3)))
+				InventoryManager.CreateWorldPickup(drop.Item, 1, dropPos + Vector3.new(math.random(-3, 3), 0.5, math.random(-3, 3)))
 			end
 		end
 	end
