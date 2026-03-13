@@ -19,6 +19,11 @@ if not InventoryUpdateEvent then
 	InventoryUpdateEvent = Instance.new("RemoteEvent"); InventoryUpdateEvent.Name = "InventoryUpdate"; InventoryUpdateEvent.Parent = Events
 end
 
+local PickupItemEvent = Events:FindFirstChild("PickupInventoryItem")
+if not PickupItemEvent then
+	PickupItemEvent = Instance.new("RemoteEvent"); PickupItemEvent.Name = "PickupInventoryItem"; PickupItemEvent.Parent = Events
+end
+
 function InventoryManager.InitPlayer(player)
 	local slots = {}
 	for i = 1, TOTAL_SLOTS do slots[i] = { Name = "", Count = 0 } end
@@ -174,19 +179,12 @@ function InventoryManager.CreateWorldPickup(itemName, count, position)
 	else pickup.Color = Color3.fromRGB(160, 160, 160) end
 	local nameVal = Instance.new("StringValue"); nameVal.Name = "ItemName"; nameVal.Value = itemName; nameVal.Parent = pickup
 	local countVal = Instance.new("IntValue"); countVal.Name = "ItemCount"; countVal.Value = count; countVal.Parent = pickup
+	local pickupTag = Instance.new("StringValue"); pickupTag.Name = "IsPickup"; pickupTag.Value = "true"; pickupTag.Parent = pickup
 	local bb = Instance.new("BillboardGui"); bb.Size = UDim2.new(0, 100, 0, 30)
 	bb.StudsOffset = Vector3.new(0, 2, 0); bb.AlwaysOnTop = false; bb.MaxDistance = 30; bb.Parent = pickup
 	local label = Instance.new("TextLabel"); label.Size = UDim2.new(1, 0, 1, 0); label.BackgroundTransparency = 1
 	label.Text = itemData.DisplayName .. " x" .. count; label.TextColor3 = Color3.fromRGB(255, 255, 200)
 	label.TextStrokeTransparency = 0.5; label.TextSize = 13; label.Font = Enum.Font.GothamBold; label.Parent = bb
-	pickup.Touched:Connect(function(hit)
-		local character = hit.Parent; local humanoid = character and character:FindFirstChildOfClass("Humanoid")
-		if not humanoid then return end
-		local touchPlayer = game:GetService("Players"):GetPlayerFromCharacter(character)
-		if not touchPlayer then return end
-		local added = InventoryManager.AddItem(touchPlayer, itemName, count)
-		if added > 0 then pickup:Destroy() end
-	end)
 	task.delay(300, function() if pickup.Parent then pickup:Destroy() end end)
 	pickup.Parent = pickupsFolder
 end
@@ -206,5 +204,23 @@ end
 
 function InventoryManager.RemovePlayer(player) inventories[player.UserId] = nil end
 function InventoryManager.GetInventory(player) return inventories[player.UserId] end
+
+PickupItemEvent.OnServerEvent:Connect(function(player, targetPickup)
+	if not player.Character then return end
+	local root = player.Character:FindFirstChild("HumanoidRootPart")
+	if not root then return end
+	if not targetPickup or not targetPickup.Parent then return end
+	if not targetPickup:FindFirstChild("IsPickup") then return end
+	local itemNameVal = targetPickup:FindFirstChild("ItemName")
+	local itemCountVal = targetPickup:FindFirstChild("ItemCount")
+	if not itemNameVal or not itemCountVal then return end
+	local pickupPos = targetPickup.Position
+	if (root.Position - pickupPos).Magnitude > 10 then return end
+	local added = InventoryManager.AddItem(player, itemNameVal.Value, itemCountVal.Value)
+	if added > 0 then
+		targetPickup:Destroy()
+		print(string.format("[PICKUP] %s picked up %s", player.Name, itemNameVal.Value))
+	end
+end)
 
 return InventoryManager

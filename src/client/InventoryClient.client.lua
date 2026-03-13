@@ -5,6 +5,7 @@
 
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
 
@@ -17,6 +18,7 @@ local SwapSlotsEvent = Events:WaitForChild("SwapSlots")
 
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
+local mouse = player:GetMouse()
 
 local UI_ASSETS = {
 	SlotTile    = "rbxassetid://94301633349386",
@@ -426,6 +428,95 @@ local StarterGui = game:GetService("StarterGui")
 pcall(function() StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.Backpack, false) end)
 task.delay(1, function()
 	pcall(function() StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.Backpack, false) end)
+end)
+
+-- =============================================
+-- WORLD PICKUP (HOVER + E)
+-- =============================================
+local PickupItemEvent = Events:WaitForChild("PickupInventoryItem", 10)
+local currentHighlight = nil
+local hoveredPickup = nil
+
+local function createPickupPrompt()
+	local gui = Instance.new("ScreenGui")
+	gui.Name = "PickupPromptGui"
+	gui.ResetOnSpawn = false
+	gui.Parent = playerGui
+
+	local frame = Instance.new("Frame")
+	frame.Name = "PromptFrame"
+	frame.Size = UDim2.new(0, 140, 0, 30)
+	frame.BackgroundColor3 = Color3.fromRGB(40, 32, 22)
+	frame.BackgroundTransparency = 0.3
+	frame.BorderSizePixel = 0
+	frame.Visible = false
+	frame.Parent = gui
+	Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 6)
+
+	local label = Instance.new("TextLabel")
+	label.Name = "Label"
+	label.Size = UDim2.new(1, 0, 1, 0)
+	label.BackgroundTransparency = 1
+	label.Text = "[E] Pick up"
+	label.TextColor3 = Color3.fromRGB(230, 220, 195)
+	label.TextSize = 12
+	label.Font = Enum.Font.GothamBold
+	label.Parent = frame
+
+	return frame
+end
+
+local promptFrame = createPickupPrompt()
+local PICKUP_HOVER_RANGE = 12
+
+local function getMousePickup()
+	local target = mouse.Target
+	if not target then return nil end
+	if target:FindFirstChild("IsPickup") then return target end
+	if target.Parent and target.Parent:FindFirstChild("IsPickup") then return target.Parent end
+	return nil
+end
+
+RunService.RenderStepped:Connect(function()
+	local pickup = getMousePickup()
+
+	if pickup and pickup:FindFirstChild("ItemName") then
+		local character = player.Character
+		if character and character:FindFirstChild("HumanoidRootPart") then
+			local dist = (character.HumanoidRootPart.Position - pickup.Position).Magnitude
+			if dist <= PICKUP_HOVER_RANGE then
+				if hoveredPickup ~= pickup then
+					if currentHighlight then currentHighlight:Destroy() end
+					currentHighlight = Instance.new("SelectionBox")
+					currentHighlight.Adornee = pickup
+					currentHighlight.Color3 = Color3.fromRGB(255, 210, 50)
+					currentHighlight.LineThickness = 0.03
+					currentHighlight.SurfaceTransparency = 0.85
+					currentHighlight.SurfaceColor3 = Color3.fromRGB(255, 220, 100)
+					currentHighlight.Parent = pickup
+					hoveredPickup = pickup
+				end
+				local itemName = pickup:FindFirstChild("ItemName")
+				promptFrame.Visible = true
+				promptFrame.Label.Text = "[E] " .. (itemName and itemName.Value or "Pick up")
+				promptFrame.Position = UDim2.new(0, mouse.X + 16, 0, mouse.Y - 15)
+				return
+			end
+		end
+	end
+
+	if currentHighlight then currentHighlight:Destroy(); currentHighlight = nil end
+	hoveredPickup = nil
+	promptFrame.Visible = false
+end)
+
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+	if gameProcessed then return end
+	if input.KeyCode == Enum.KeyCode.E then
+		if hoveredPickup and hoveredPickup.Parent and PickupItemEvent then
+			PickupItemEvent:FireServer(hoveredPickup)
+		end
+	end
 end)
 
 print("[INVENTORY] Inventory client loaded")

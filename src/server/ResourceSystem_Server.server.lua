@@ -123,7 +123,7 @@ local RESOURCE_NODES = {
 		ToolBonus = "Axe", ToolDamage = 2,
 		Drops = {
 			{ Type = "carry", CarryItem = "Log", Min = 1, Max = 1 },
-			{ Type = "inventory", Item = "Sticks", Min = 1, Max = 2 },
+			{ Type = "pickup", Item = "Sticks", Min = 1, Max = 2 },
 		},
 		DropsSapling = true, NoRespawn = true,
 	},
@@ -383,6 +383,10 @@ local function destroyNode(node, nodeType, config, player)
 		elseif drop.Type == "inventory" then
 			InventoryManager.AddItem(player, drop.Item, amount)
 			print(string.format("[GATHER] %s received %dx %s", player.Name, amount, drop.Item))
+		elseif drop.Type == "pickup" then
+			for p = 1, amount do
+				InventoryManager.CreateWorldPickup(drop.Item, 1, dropPos + Vector3.new(math.random(-3, 3), 1, math.random(-3, 3)))
+			end
 		end
 	end
 	if config.DropsSapling then spawnSaplingCarry(dropPos, variant) end
