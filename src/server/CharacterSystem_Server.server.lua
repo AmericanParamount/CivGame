@@ -47,6 +47,13 @@ local function applyScale(player, age)
 		scale = scalingConfig.ChildScale + (scalingConfig.AdultScale - scalingConfig.ChildScale) * progress
 	end
 	character:ScaleTo(scale)
+	local head = character:FindFirstChild("Head")
+	if head then
+		local billboard = head:FindFirstChild("LineageTag")
+		if billboard and billboard:IsA("BillboardGui") then
+			billboard.StudsOffset = Vector3.new(0, 2.5 / scale, 0)
+		end
+	end
 end
 
 local function applySpeed(player, data)

@@ -23,6 +23,10 @@ local MODEL_NAME_OVERRIDES = {
 	Sticks = "Stick",
 }
 
+local ITEM_HOLD_OFFSETS = {
+	Sticks = CFrame.new(0, -1, 0) * CFrame.Angles(math.rad(90), 0, 0),
+}
+
 local DEFAULT_SHAPES = {
 	Resource = {
 		Size     = Vector3.new(1, 0.3, 0.3),
@@ -88,7 +92,7 @@ local function attachHeldModel(itemName, category)
 		or character:FindFirstChild("RightHand")              -- R15
 	if not rightArm then return end
 
-	local offset = (category == "Tool") and HOLD_OFFSET_TOOL or HOLD_OFFSET_R6
+	local offset = ITEM_HOLD_OFFSETS[itemName] or ((category == "Tool") and HOLD_OFFSET_TOOL or HOLD_OFFSET_R6)
 	local heldPart = nil
 	local heldRoot = nil  -- top-level instance tracked for cleanup
 

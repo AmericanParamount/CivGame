@@ -91,7 +91,15 @@ local function applyFullAppearance(player, appearance)
 	applyHair(character, appearance.Gender, appearance.HairStyle, appearance.HairColor)
 	local existingTag = character:FindFirstChild("LineageTag"); if existingTag then existingTag:Destroy() end
 	local billboard = Instance.new("BillboardGui"); billboard.Name = "LineageTag"
-	billboard.Size = UDim2.new(0, 200, 0, 50); billboard.StudsOffset = Vector3.new(0, 2.5, 0)
+	local currentScale = 1
+	local humanoid = character:FindFirstChildOfClass("Humanoid")
+	if humanoid then
+		local scaleValue = humanoid:FindFirstChild("BodyHeightScale")
+		if scaleValue and scaleValue:IsA("NumberValue") then
+			currentScale = scaleValue.Value
+		end
+	end
+	billboard.Size = UDim2.new(0, 200, 0, 50); billboard.StudsOffset = Vector3.new(0, 2.5 / currentScale, 0)
 	billboard.AlwaysOnTop = false; billboard.MaxDistance = 50; billboard.Parent = character.Head
 	local nameLabel = Instance.new("TextLabel"); nameLabel.Size = UDim2.new(1, 0, 0.5, 0)
 	nameLabel.BackgroundTransparency = 1; nameLabel.Text = player.DisplayName
