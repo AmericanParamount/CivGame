@@ -23,7 +23,7 @@ local playerGui = player:WaitForChild("PlayerGui")
 local mouse = player:GetMouse()
 
 local UI_ASSETS = {
-	SlotTile    = "rbxassetid://94301633349386",
+	SlotTile    = "rbxassetid://131791429701764",
 	HotbarPanel = "rbxassetid://104728264943743",
 }
 
@@ -100,15 +100,6 @@ local function createHotbar()
 		slotImg.ScaleType = Enum.ScaleType.Stretch
 		slotImg.Parent = slot
 
-		-- Golden glow border (hidden by default)
-		local glowStroke = Instance.new("UIStroke")
-		glowStroke.Name = "GlowStroke"
-		glowStroke.Color = THEME.SelectedGlow
-		glowStroke.Thickness = 3
-		glowStroke.Transparency = 1
-		glowStroke.Parent = slot
-		Instance.new("UICorner", slot).CornerRadius = UDim.new(0, 6)
-
 		-- Item name
 		local nameLabel = Instance.new("TextLabel")
 		nameLabel.Name = "ItemName"
@@ -172,29 +163,20 @@ end
 -- =============================================
 local function animateSlot(slot, isSelected)
 	if not slot then return end
-	local glowStroke = slot:FindFirstChild("GlowStroke")
 	local normalX = slot:GetAttribute("NormalX") or 0
 	local normalY = slot:GetAttribute("NormalY") or 0
 
 	if isSelected then
-		-- Pop up: grow larger, shift up, show glow
 		TweenService:Create(slot, popUpTween, {
 			Size = UDim2.new(0, SLOT_SIZE + SELECTED_GROW, 0, SLOT_SIZE + SELECTED_GROW),
 			Position = UDim2.new(0, normalX - SELECTED_GROW / 2, 0, normalY - SELECTED_RISE)
 		}):Play()
-		if glowStroke then
-			TweenService:Create(glowStroke, popUpTween, { Transparency = 0 }):Play()
-		end
-		slot.ZIndex = 5  -- above other slots
+		slot.ZIndex = 5
 	else
-		-- Pop down: return to normal
 		TweenService:Create(slot, popDownTween, {
 			Size = UDim2.new(0, SLOT_SIZE, 0, SLOT_SIZE),
 			Position = UDim2.new(0, normalX, 0, normalY)
 		}):Play()
-		if glowStroke then
-			TweenService:Create(glowStroke, popDownTween, { Transparency = 1 }):Play()
-		end
 		slot.ZIndex = 2
 	end
 end

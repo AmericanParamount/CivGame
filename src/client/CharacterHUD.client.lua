@@ -4,7 +4,6 @@
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local TweenService = game:GetService("TweenService")
 
 local Events = ReplicatedStorage:WaitForChild("Events")
 local StatsUpdateEvent = Events:WaitForChild("StatsUpdate")
@@ -13,28 +12,18 @@ local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
 
 local UI_ASSETS = {
-	StatPanel  = "rbxassetid://79685099301049",
 	TopInfoBar = "rbxassetid://101582090412308",
 }
 
 local ICONS = {
-	Health = "rbxassetid://97444507059266",
-	Hunger = "rbxassetid://76698443074638",
-	Thirst = "rbxassetid://134767492227695",
-	Age    = "rbxassetid://73314400891073",
+	Age = "rbxassetid://73314400891073",
 }
 
 local COLORS = {
-	TextDark    = Color3.fromRGB(62, 48, 32),
-	TextMedium  = Color3.fromRGB(100, 80, 55),
-	TextLight   = Color3.fromRGB(140, 120, 85),
-	Gold        = Color3.fromRGB(180, 145, 55),
-	HealthFull  = Color3.fromRGB(180, 45, 40),
-	HungerFull  = Color3.fromRGB(210, 160, 40),
-	ThirstFull  = Color3.fromRGB(45, 160, 220),
-	BarLow      = Color3.fromRGB(210, 155, 40),
-	BarCritical = Color3.fromRGB(195, 55, 45),
-	BarBg       = Color3.fromRGB(165, 150, 125),
+	TextDark   = Color3.fromRGB(62, 48, 32),
+	TextMedium = Color3.fromRGB(100, 80, 55),
+	TextLight  = Color3.fromRGB(140, 120, 85),
+	Gold       = Color3.fromRGB(180, 145, 55),
 }
 
 local screenGui = Instance.new("ScreenGui")
@@ -107,115 +96,69 @@ stageLabel.TextXAlignment = Enum.TextXAlignment.Center
 stageLabel.Parent = topBar
 
 -- =============================================
--- STAT BARS PANEL
+-- STAT ICONS (Minecraft-style icon rows)
 -- =============================================
-local STAT_PANEL_W = 260
-local STAT_PANEL_H = 180
+local STAT_ICONS = {
+	HealthFull  = "rbxassetid://78332096683950",
+	HealthHalf  = "rbxassetid://130555306878603",
+	HealthEmpty = "rbxassetid://118868547117519",
+	HungerFull  = "rbxassetid://97360668447675",
+	HungerHalf  = "rbxassetid://87090025823313",
+	HungerEmpty = "rbxassetid://105920765789558",
+	ThirstFull  = "rbxassetid://130021588377524",
+	ThirstEmpty = "rbxassetid://123937704514273",
+}
 
-local statPanel = Instance.new("ImageLabel")
-statPanel.Name = "StatPanel"
-statPanel.Size = UDim2.new(0, STAT_PANEL_W, 0, STAT_PANEL_H)
-statPanel.Position = UDim2.new(0, 16, 1, -(STAT_PANEL_H + 16))
-statPanel.BackgroundTransparency = 1
-statPanel.Image = UI_ASSETS.StatPanel
-statPanel.ScaleType = Enum.ScaleType.Stretch
-statPanel.Parent = screenGui
+local ICON_SIZE = 18
+local ICON_PADDING = 2
+local ICONS_PER_STAT = 10
+local STAT_ROW_GAP = 4
+local STATS_BOTTOM_OFFSET = 108
 
--- =============================================
--- TUNING GUIDE:
--- ROW_Y = pixel Y-center of each bar inside the panel image
--- BAR_LEFT = how far right the bar starts (past the icon circles)
--- BAR_WIDTH = width of the colored fill bar
--- ICON_X = horizontal position of stat icons
--- Adjust these until bars sit perfectly inside the image's indented areas
--- =============================================
-local ICON_X = 18
-local BAR_LEFT = 52
-local BAR_WIDTH = 180
-local BAR_HEIGHT = 16
-local ICON_SIZE = 22
+local panelWidth = ICONS_PER_STAT * (ICON_SIZE + ICON_PADDING) - ICON_PADDING
+local panelHeight = 3 * ICON_SIZE + 2 * STAT_ROW_GAP
 
--- ADJUST THESE 3 VALUES to align bars with your stat panel image:
-local ROW_Y = {58, 102, 146}
+local statsPanel = Instance.new("Frame")
+statsPanel.Name = "StatsIconPanel"
+statsPanel.Size = UDim2.new(0, panelWidth, 0, panelHeight)
+statsPanel.Position = UDim2.new(0.5, -panelWidth / 2, 1, -(STATS_BOTTOM_OFFSET + panelHeight))
+statsPanel.BackgroundTransparency = 1
+statsPanel.BorderSizePixel = 0
+statsPanel.Parent = screenGui
 
-local function createStatBar(name, icon, color, rowIndex)
-	local yCenter = ROW_Y[rowIndex]
+local healthIcons = {}
+local hungerIcons = {}
+local thirstIcons = {}
 
-	local iconLabel = Instance.new("ImageLabel")
-	iconLabel.Name = name .. "Icon"
-	iconLabel.Size = UDim2.new(0, ICON_SIZE, 0, ICON_SIZE)
-	iconLabel.Position = UDim2.new(0, ICON_X, 0, yCenter - ICON_SIZE / 2)
-	iconLabel.BackgroundTransparency = 1
-	iconLabel.Image = icon
-	iconLabel.Parent = statPanel
-
-	local barBg = Instance.new("Frame")
-	barBg.Name = name .. "BarBg"
-	barBg.Size = UDim2.new(0, BAR_WIDTH, 0, BAR_HEIGHT)
-	barBg.Position = UDim2.new(0, BAR_LEFT, 0, yCenter - BAR_HEIGHT / 2)
-	barBg.BackgroundColor3 = COLORS.BarBg
-	barBg.BackgroundTransparency = 0.4
-	barBg.BorderSizePixel = 0
-	barBg.Parent = statPanel
-	Instance.new("UICorner", barBg).CornerRadius = UDim.new(0, 5)
-
-	local fill = Instance.new("Frame")
-	fill.Name = "Fill"
-	fill.Size = UDim2.new(1, 0, 1, 0)
-	fill.BackgroundColor3 = color
-	fill.BorderSizePixel = 0
-	fill.Parent = barBg
-	Instance.new("UICorner", fill).CornerRadius = UDim.new(0, 5)
-
-	local gradient = Instance.new("UIGradient")
-	gradient.Transparency = NumberSequence.new({
-		NumberSequenceKeypoint.new(0, 0.1),
-		NumberSequenceKeypoint.new(0.5, 0.3),
-		NumberSequenceKeypoint.new(1, 0.5),
-	})
-	gradient.Rotation = 270
-	gradient.Parent = fill
-
-	local nameLabel = Instance.new("TextLabel")
-	nameLabel.Size = UDim2.new(0.5, 0, 1, 0)
-	nameLabel.Position = UDim2.new(0, 6, 0, 0)
-	nameLabel.BackgroundTransparency = 1
-	nameLabel.Text = name
-	nameLabel.TextColor3 = Color3.new(1, 1, 1)
-	nameLabel.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
-	nameLabel.TextStrokeTransparency = 0.5
-	nameLabel.TextSize = 10; nameLabel.Font = Enum.Font.GothamBold
-	nameLabel.TextXAlignment = Enum.TextXAlignment.Left
-	nameLabel.ZIndex = 3; nameLabel.Parent = barBg
-
-	local valueLabel = Instance.new("TextLabel")
-	valueLabel.Name = "Value"
-	valueLabel.Size = UDim2.new(1, -6, 1, 0)
-	valueLabel.BackgroundTransparency = 1
-	valueLabel.Text = "100/100"
-	valueLabel.TextColor3 = Color3.new(1, 1, 1)
-	valueLabel.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
-	valueLabel.TextStrokeTransparency = 0.5
-	valueLabel.TextSize = 10; valueLabel.Font = Enum.Font.GothamBold
-	valueLabel.TextXAlignment = Enum.TextXAlignment.Right
-	valueLabel.ZIndex = 3; valueLabel.Parent = barBg
-
-	return { Fill = fill, Value = valueLabel, DefaultColor = color }
+local function createStatIcons(tbl, rowY)
+	for i = 1, ICONS_PER_STAT do
+		local icon = Instance.new("ImageLabel")
+		icon.Name = "Icon" .. i
+		icon.Size = UDim2.new(0, ICON_SIZE, 0, ICON_SIZE)
+		icon.Position = UDim2.new(0, (i - 1) * (ICON_SIZE + ICON_PADDING), 0, rowY)
+		icon.BackgroundTransparency = 1
+		icon.Image = ""
+		icon.Parent = statsPanel
+		tbl[i] = icon
+	end
 end
 
-local healthBar = createStatBar("Health", ICONS.Health, COLORS.HealthFull, 1)
-local hungerBar = createStatBar("Hunger", ICONS.Hunger, COLORS.HungerFull, 2)
-local thirstBar = createStatBar("Thirst", ICONS.Thirst, COLORS.ThirstFull, 3)
+createStatIcons(healthIcons, 0)
+createStatIcons(hungerIcons, ICON_SIZE + STAT_ROW_GAP)
+createStatIcons(thirstIcons, 2 * (ICON_SIZE + STAT_ROW_GAP))
 
-local tweenInfo = TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
-
-local function updateBar(bar, current, max)
-	local ratio = math.clamp(current / max, 0, 1)
-	TweenService:Create(bar.Fill, tweenInfo, { Size = UDim2.new(ratio, 0, 1, 0) }):Play()
-	bar.Value.Text = tostring(current) .. "/" .. tostring(max)
-	if ratio < 0.25 then bar.Fill.BackgroundColor3 = COLORS.BarCritical
-	elseif ratio < 0.5 then bar.Fill.BackgroundColor3 = COLORS.BarLow
-	else bar.Fill.BackgroundColor3 = bar.DefaultColor end
+local function updateStatIcons(current, max, icons, fullImg, halfImg, emptyImg)
+	local pointsPerIcon = max / ICONS_PER_STAT
+	for i = 1, ICONS_PER_STAT do
+		local threshold = i * pointsPerIcon
+		if current >= threshold then
+			icons[i].Image = fullImg
+		elseif halfImg and current >= threshold - (pointsPerIcon / 2) then
+			icons[i].Image = halfImg
+		else
+			icons[i].Image = emptyImg
+		end
+	end
 end
 
 local function updateHUD(stats)
@@ -224,9 +167,11 @@ local function updateHUD(stats)
 	elseif stats.Age >= 55 then stageLabel.Text = "Elder"
 	else stageLabel.Text = "Adult" end
 	lineageLabel.Text = stats.Lineage or "Unknown"
-	updateBar(healthBar, stats.Health, stats.MaxHealth)
-	updateBar(hungerBar, stats.Hunger, stats.MaxHunger)
-	if stats.Thirst then updateBar(thirstBar, stats.Thirst, stats.MaxThirst) end
+	updateStatIcons(stats.Health, stats.MaxHealth, healthIcons, STAT_ICONS.HealthFull, STAT_ICONS.HealthHalf, STAT_ICONS.HealthEmpty)
+	updateStatIcons(stats.Hunger, stats.MaxHunger, hungerIcons, STAT_ICONS.HungerFull, STAT_ICONS.HungerHalf, STAT_ICONS.HungerEmpty)
+	if stats.Thirst then
+		updateStatIcons(stats.Thirst, stats.MaxThirst, thirstIcons, STAT_ICONS.ThirstFull, nil, STAT_ICONS.ThirstEmpty)
+	end
 end
 
 StatsUpdateEvent.OnClientEvent:Connect(function(stats) updateHUD(stats) end)
