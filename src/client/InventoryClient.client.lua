@@ -15,6 +15,8 @@ local SelectSlotEvent = Events:WaitForChild("SelectSlot")
 local EatEvent = Events:WaitForChild("EatItem")
 local DropItemEvent = Events:WaitForChild("DropItem")
 local SwapSlotsEvent = Events:WaitForChild("SwapSlots")
+local CarryStateEvent = Events:WaitForChild("CarryStateChanged", 10)
+local isCarrying = false
 
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
@@ -326,6 +328,7 @@ end
 -- =============================================
 function toggleSlot(index)
 	if not inventoryData then return end
+	if isCarrying then return end
 	if index < 1 or index > HOTBAR_SIZE then return end
 
 	local slotData = inventoryData.Slots[index]
@@ -393,6 +396,7 @@ UserInputService.InputBegan:Connect(function(input, gp)
 		if backpackGui then backpackGui.Enabled = backpackOpen end
 	end
 	if input.KeyCode == Enum.KeyCode.Q then
+		if isCarrying then return end
 		if selectedSlot > 0 and inventoryData then
 			local slotData = inventoryData.Slots[selectedSlot]
 			if slotData and slotData.Name ~= "" then
@@ -423,6 +427,17 @@ end)
 -- =============================================
 createHotbar()
 createBackpack()
+
+if CarryStateEvent then
+	CarryStateEvent.OnClientEvent:Connect(function(carrying)
+		isCarrying = carrying
+		if carrying and selectedSlot ~= 0 then
+			selectedSlot = 0
+			SelectSlotEvent:FireServer(0)
+			refreshUI()
+		end
+	end)
+end
 
 local StarterGui = game:GetService("StarterGui")
 pcall(function() StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.Backpack, false) end)

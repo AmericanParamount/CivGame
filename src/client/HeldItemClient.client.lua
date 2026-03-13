@@ -89,6 +89,8 @@ local function attachHeldModel(itemName, category)
 	if not rightArm then return end
 
 	local offset = (category == "Tool") and HOLD_OFFSET_TOOL or HOLD_OFFSET_R6
+	local heldPart = nil
+	local heldRoot = nil  -- top-level instance tracked for cleanup
 
 	-- Try custom model first
 	local heldFolder = getHeldItemsFolder()
@@ -98,36 +100,47 @@ local function attachHeldModel(itemName, category)
 		if template then
 			local clone = template:Clone()
 			clone.Name = "HeldItemModel"
+
 			if clone:IsA("Model") then
 				if not clone.PrimaryPart then
 					for _, p in ipairs(clone:GetDescendants()) do
 						if p:IsA("BasePart") then clone.PrimaryPart = p; break end
 					end
 				end
-				for _, p in ipairs(clone:GetDescendants()) do
-					if p:IsA("BasePart") then p.Anchored = false; p.CanCollide = false; p.Massless = true end
+				if clone.PrimaryPart then
+					for _, p in ipairs(clone:GetDescendants()) do
+						if p:IsA("BasePart") then p.Anchored = false; p.CanCollide = false; p.Massless = true end
+					end
+					clone.Parent = character
+					heldPart = clone.PrimaryPart
+					heldRoot = clone
+				else
+					clone:Destroy()
 				end
+
+			elseif clone:IsA("BasePart") then
+				clone.Anchored = false
+				clone.CanCollide = false
+				clone.Massless = true
 				clone.Parent = character
-				local motor = Instance.new("Motor6D")
-				motor.Name = "HeldItemMotor"
-				motor.Part0 = rightArm
-				motor.Part1 = clone.PrimaryPart
-				motor.C0 = offset
-				motor.C1 = CFrame.new()
-				motor.Parent = rightArm
-				currentHeldModel = clone
-				currentHeldItem = itemName
-				return
+				heldPart = clone
+				heldRoot = clone
+			else
+				clone:Destroy()
 			end
 		end
 	end
 
-	-- Default: build a simple Part
-	local heldPart = buildDefaultPart(category or "Resource")
-	heldPart.Anchored = false
-	heldPart.CanCollide = false
-	heldPart.Massless = true
-	heldPart.Parent = character
+	-- Fallback: build default part
+	if not heldPart then
+		local defaultPart = buildDefaultPart(category or "Resource")
+		defaultPart.Anchored = false
+		defaultPart.CanCollide = false
+		defaultPart.Massless = true
+		defaultPart.Parent = character
+		heldPart = defaultPart
+		heldRoot = defaultPart
+	end
 
 	local motor = Instance.new("Motor6D")
 	motor.Name = "HeldItemMotor"
@@ -137,14 +150,16 @@ local function attachHeldModel(itemName, category)
 	motor.C1 = CFrame.new()
 	motor.Parent = rightArm
 
-	currentHeldModel = heldPart
+	currentHeldModel = heldRoot
 	currentHeldItem = itemName
+	print("[HELD] Attached " .. itemName .. " to right hand")
 end
 
 -- =============================================
 -- SLOT EVALUATION
 -- =============================================
 local function refreshHeldItem()
+	print("[HELD] refreshHeldItem: selected=" .. tostring(latestSelected) .. " currentHeld=" .. tostring(currentHeldItem))
 	local slots    = latestSlots
 	local selected = latestSelected
 
