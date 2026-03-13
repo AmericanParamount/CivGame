@@ -4,6 +4,8 @@
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local TweenService = game:GetService("TweenService")
+local RunService = game:GetService("RunService")
 
 local Events = ReplicatedStorage:WaitForChild("Events")
 local StatsUpdateEvent = Events:WaitForChild("StatsUpdate")
@@ -96,12 +98,12 @@ stageLabel.TextXAlignment = Enum.TextXAlignment.Center
 stageLabel.Parent = topBar
 
 -- =============================================
--- STAT ICONS (Minecraft-style icon rows)
+-- STAT BAR (unified horizontal icon bar)
 -- =============================================
 local STAT_ICONS = {
-	HealthFull  = "rbxassetid://78332096683950",
-	HealthHalf  = "rbxassetid://130555306878603",
-	HealthEmpty = "rbxassetid://118868547117519",
+	HealthFull  = "rbxassetid://106591422612852",
+	HealthHalf  = "rbxassetid://82042308865605",
+	HealthEmpty = "rbxassetid://75702978374004",
 	HungerFull  = "rbxassetid://97360668447675",
 	HungerHalf  = "rbxassetid://87090025823313",
 	HungerEmpty = "rbxassetid://105920765789558",
@@ -109,64 +111,160 @@ local STAT_ICONS = {
 	ThirstEmpty = "rbxassetid://123937704514273",
 }
 
-local ICON_SIZE = 18
-local ICON_PADDING = 2
-local ICONS_PER_STAT = 10
-local STAT_ROW_GAP = 4
-local STATS_BOTTOM_OFFSET = 108
+local ICON_SIZE       = 18
+local ICON_GAP        = 2
+local SECTION_ICONS   = 10
+local DIVIDER_WIDTH   = 1
+local BAR_PADDING_X   = 6
+local BAR_PADDING_Y   = 3
+local DIVIDER_MARGIN  = 8
+local BAR_BOTTOM_OFFSET = 108
 
-local panelWidth = ICONS_PER_STAT * (ICON_SIZE + ICON_PADDING) - ICON_PADDING
-local panelHeight = 3 * ICON_SIZE + 2 * STAT_ROW_GAP
+local sectionWidth = SECTION_ICONS * ICON_SIZE + (SECTION_ICONS - 1) * ICON_GAP
+local totalWidth   = BAR_PADDING_X * 2 + sectionWidth * 3 + (DIVIDER_MARGIN * 2 + DIVIDER_WIDTH) * 2
+local barHeight    = ICON_SIZE + BAR_PADDING_Y * 2
 
-local statsPanel = Instance.new("Frame")
-statsPanel.Name = "StatsIconPanel"
-statsPanel.Size = UDim2.new(0, panelWidth, 0, panelHeight)
-statsPanel.Position = UDim2.new(0.5, -panelWidth / 2, 1, -(STATS_BOTTOM_OFFSET + panelHeight))
-statsPanel.BackgroundTransparency = 1
-statsPanel.BorderSizePixel = 0
-statsPanel.Parent = screenGui
+local statBar = Instance.new("Frame")
+statBar.Name = "StatBar"
+statBar.Size = UDim2.new(0, totalWidth, 0, barHeight)
+statBar.Position = UDim2.new(0.5, -totalWidth / 2, 1, -(BAR_BOTTOM_OFFSET + barHeight))
+statBar.BackgroundColor3 = Color3.fromRGB(20, 16, 12)
+statBar.BackgroundTransparency = 0.4
+statBar.BorderSizePixel = 0
+statBar.Parent = screenGui
+Instance.new("UICorner", statBar).CornerRadius = UDim.new(0, 6)
 
 local healthIcons = {}
 local hungerIcons = {}
 local thirstIcons = {}
 
-local function createStatIcons(tbl, rowY)
-	for i = 1, ICONS_PER_STAT do
-		local icon = Instance.new("ImageLabel")
-		icon.Name = "Icon" .. i
-		icon.Size = UDim2.new(0, ICON_SIZE, 0, ICON_SIZE)
-		icon.Position = UDim2.new(0, (i - 1) * (ICON_SIZE + ICON_PADDING), 0, rowY)
-		icon.BackgroundTransparency = 1
-		icon.Image = ""
-		icon.Parent = statsPanel
-		tbl[i] = icon
-	end
+local function makeIcon(xPos, tbl)
+	local icon = Instance.new("ImageLabel")
+	icon.Size = UDim2.new(0, ICON_SIZE, 0, ICON_SIZE)
+	icon.Position = UDim2.new(0, xPos, 0, BAR_PADDING_Y)
+	icon.BackgroundTransparency = 1
+	icon.Image = ""
+	icon.ScaleType = Enum.ScaleType.Fit
+	icon:SetAttribute("BaseX", xPos)
+	icon:SetAttribute("BaseY", BAR_PADDING_Y)
+	icon.Parent = statBar
+	tbl[#tbl + 1] = icon
+	return xPos + ICON_SIZE + ICON_GAP
 end
 
-createStatIcons(healthIcons, 0)
-createStatIcons(hungerIcons, ICON_SIZE + STAT_ROW_GAP)
-createStatIcons(thirstIcons, 2 * (ICON_SIZE + STAT_ROW_GAP))
+local function makeDivider(xPos)
+	local div = Instance.new("Frame")
+	div.Size = UDim2.new(0, DIVIDER_WIDTH, 1, -6)
+	div.Position = UDim2.new(0, xPos + DIVIDER_MARGIN, 0, 3)
+	div.BackgroundColor3 = Color3.fromRGB(120, 90, 50)
+	div.BackgroundTransparency = 0.5
+	div.BorderSizePixel = 0
+	div.Parent = statBar
+	return xPos + DIVIDER_MARGIN * 2 + DIVIDER_WIDTH
+end
+
+local function buildStatBar()
+	local x = BAR_PADDING_X
+	for _ = 1, SECTION_ICONS do x = makeIcon(x, healthIcons) end
+	x = x - ICON_GAP  -- remove trailing gap before divider
+	x = makeDivider(x)
+	for _ = 1, SECTION_ICONS do x = makeIcon(x, hungerIcons) end
+	x = x - ICON_GAP
+	x = makeDivider(x)
+	for _ = 1, SECTION_ICONS do x = makeIcon(x, thirstIcons) end
+end
+
+buildStatBar()
+
+-- =============================================
+-- ICON STATE LOGIC
+-- =============================================
+local previousIconStates = {}
+local popTween = TweenInfo.new(0.2, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
 
 local function updateStatIcons(current, max, icons, fullImg, halfImg, emptyImg)
-	local pointsPerIcon = max / ICONS_PER_STAT
-	for i = 1, ICONS_PER_STAT do
+	local pointsPerIcon = max / #icons
+	for i, icon in ipairs(icons) do
 		local threshold = i * pointsPerIcon
+		local newState, newImage = "empty", emptyImg
+
 		if current >= threshold then
-			icons[i].Image = fullImg
+			newState, newImage = "full", fullImg
 		elseif halfImg and current >= threshold - (pointsPerIcon / 2) then
-			icons[i].Image = halfImg
-		else
-			icons[i].Image = emptyImg
+			newState, newImage = "half", halfImg
+		end
+
+		local oldState = previousIconStates[icon]
+		if oldState ~= newState then
+			icon.Image = newImage
+			previousIconStates[icon] = newState
+
+			if oldState ~= nil then
+				local bx = icon:GetAttribute("BaseX")
+				local by = icon:GetAttribute("BaseY")
+				icon.Size = UDim2.new(0, ICON_SIZE * 1.4, 0, ICON_SIZE * 1.4)
+				icon.Position = UDim2.new(0, bx - ICON_SIZE * 0.2, 0, by - ICON_SIZE * 0.2)
+				TweenService:Create(icon, popTween, {
+					Size = UDim2.new(0, ICON_SIZE, 0, ICON_SIZE),
+					Position = UDim2.new(0, bx, 0, by),
+				}):Play()
+			end
 		end
 	end
 end
 
+-- =============================================
+-- LOW STAT PULSE
+-- =============================================
+local latestHealth,    latestMaxHealth    = 100, 100
+local latestHunger,    latestMaxHunger    = 100, 100
+local latestThirst,    latestMaxThirst    = 100, 100
+
+local pulseTime = 0
+RunService.Heartbeat:Connect(function(dt)
+	pulseTime = pulseTime + dt
+
+	local function pulseIcons(current, max, icons)
+		local ratio = current / max
+		if ratio > 0.25 then return end
+		local speed = ratio <= 0.1 and 6 or 3
+		local scale = 1 + math.sin(pulseTime * speed) * 0.08
+		local offset = (scale - 1) * ICON_SIZE / 2
+		for _, icon in ipairs(icons) do
+			local state = previousIconStates[icon]
+			if state == "full" or state == "half" then
+				local bx = icon:GetAttribute("BaseX")
+				local by = icon:GetAttribute("BaseY")
+				icon.Size = UDim2.new(0, ICON_SIZE * scale, 0, ICON_SIZE * scale)
+				icon.Position = UDim2.new(0, bx - offset, 0, by - offset)
+			end
+		end
+	end
+
+	pulseIcons(latestHealth, latestMaxHealth, healthIcons)
+	pulseIcons(latestHunger, latestMaxHunger, hungerIcons)
+	pulseIcons(latestThirst, latestMaxThirst, thirstIcons)
+end)
+
+-- =============================================
+-- UPDATE
+-- =============================================
 local function updateHUD(stats)
 	ageLabel.Text = "Age: " .. tostring(stats.Age)
 	if stats.Age < 16 then stageLabel.Text = "Child"
 	elseif stats.Age >= 55 then stageLabel.Text = "Elder"
 	else stageLabel.Text = "Adult" end
 	lineageLabel.Text = stats.Lineage or "Unknown"
+
+	latestHealth    = stats.Health
+	latestMaxHealth = stats.MaxHealth
+	latestHunger    = stats.Hunger
+	latestMaxHunger = stats.MaxHunger
+	if stats.Thirst then
+		latestThirst    = stats.Thirst
+		latestMaxThirst = stats.MaxThirst
+	end
+
 	updateStatIcons(stats.Health, stats.MaxHealth, healthIcons, STAT_ICONS.HealthFull, STAT_ICONS.HealthHalf, STAT_ICONS.HealthEmpty)
 	updateStatIcons(stats.Hunger, stats.MaxHunger, hungerIcons, STAT_ICONS.HungerFull, STAT_ICONS.HungerHalf, STAT_ICONS.HungerEmpty)
 	if stats.Thirst then
