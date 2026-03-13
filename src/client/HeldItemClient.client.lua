@@ -8,7 +8,6 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Events = ReplicatedStorage:WaitForChild("Events")
 local InventoryUpdateEvent = Events:WaitForChild("InventoryUpdate", 15)
-local CarryStateEvent = Events:WaitForChild("CarryStateChanged", 15)
 
 if not InventoryUpdateEvent then warn("[HELD] Missing InventoryUpdate event!"); return end
 
@@ -47,7 +46,6 @@ local DEFAULT_SHAPES = {
 -- =============================================
 local currentHeldItem  = nil   -- item name string or nil
 local currentHeldModel = nil   -- Instance in workspace or nil
-local isCarrying       = false
 local latestSlots      = nil
 local latestSelected   = 0
 
@@ -62,7 +60,9 @@ local function destroyHeldModel()
 end
 
 local function getHeldItemsFolder()
-	return ReplicatedStorage:FindFirstChild("Models")
+	local models = ReplicatedStorage:FindFirstChild("Models")
+	if not models then return nil end
+	return models:FindFirstChild("HeldItems")
 end
 
 local function buildDefaultPart(category)
@@ -145,12 +145,6 @@ end
 -- SLOT EVALUATION
 -- =============================================
 local function refreshHeldItem()
-	if isCarrying then
-		destroyHeldModel()
-		currentHeldItem = nil
-		return
-	end
-
 	local slots    = latestSlots
 	local selected = latestSelected
 
@@ -185,13 +179,6 @@ InventoryUpdateEvent.OnClientEvent:Connect(function(data)
 	latestSelected = data.SelectedSlot or 0
 	refreshHeldItem()
 end)
-
-if CarryStateEvent then
-	CarryStateEvent.OnClientEvent:Connect(function(carrying)
-		isCarrying = carrying
-		refreshHeldItem()
-	end)
-end
 
 player.CharacterAdded:Connect(function()
 	-- Clean up old model; re-attach once character is ready if slot is active
