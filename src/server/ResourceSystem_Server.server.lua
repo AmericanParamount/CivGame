@@ -312,7 +312,8 @@ end
 local function hideNode(node)
 	if node:IsA("Model") then
 		for _, p in ipairs(node:GetDescendants()) do
-			if p:IsA("BasePart") then p.Transparency = 1; p.CanCollide = false end
+			if p:IsA("BasePart") then p.Transparency = 1; p.CanCollide = false
+			elseif p:IsA("Texture") or p:IsA("Decal") or p:IsA("SurfaceGui") then p.Transparency = 1 end
 		end
 	elseif node:IsA("BasePart") then node.Transparency = 1; node.CanCollide = false end
 end
@@ -320,7 +321,8 @@ end
 local function showNode(node)
 	if node:IsA("Model") then
 		for _, p in ipairs(node:GetDescendants()) do
-			if p:IsA("BasePart") then p.Transparency = 0; p.CanCollide = true end
+			if p:IsA("BasePart") then p.Transparency = 0; p.CanCollide = true
+			elseif p:IsA("Texture") or p:IsA("Decal") or p:IsA("SurfaceGui") then p.Transparency = 0 end
 		end
 	elseif node:IsA("BasePart") then node.Transparency = 0; node.CanCollide = true end
 end
