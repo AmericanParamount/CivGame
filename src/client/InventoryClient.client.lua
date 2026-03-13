@@ -417,6 +417,7 @@ InventoryUpdateEvent.OnClientEvent:Connect(function(data)
 		local slotData = data.Slots[selectedSlot]
 		if not slotData or slotData.Name == "" then
 			selectedSlot = 0
+			SelectSlotEvent:FireServer(0)
 		end
 	end
 	refreshUI()
