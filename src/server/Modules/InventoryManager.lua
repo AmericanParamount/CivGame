@@ -171,13 +171,48 @@ function InventoryManager.CreateWorldPickup(itemName, count, position)
 	local itemData = ItemConfig.GetItem(itemName); if not itemData then return end
 	local pickupsFolder = workspace:FindFirstChild("Pickups")
 	if not pickupsFolder then pickupsFolder = Instance.new("Folder"); pickupsFolder.Name = "Pickups"; pickupsFolder.Parent = workspace end
-	local pickup = Instance.new("Part"); pickup.Name = "Pickup_" .. itemName
-	pickup.Size = Vector3.new(2, 2, 2); pickup.Position = position
-	pickup.Anchored = false; pickup.CanCollide = true
-	pickup.Material = Enum.Material.SmoothPlastic; pickup.Shape = Enum.PartType.Block
-	if itemData.Category == "Resource" then pickup.Color = Color3.fromRGB(139, 105, 65)
-	elseif itemData.Category == "Food" then pickup.Color = Color3.fromRGB(120, 180, 80)
-	else pickup.Color = Color3.fromRGB(160, 160, 160) end
+	local pickup = nil
+	local modelsFolder = ReplicatedStorage:FindFirstChild("Models")
+	if modelsFolder then
+		local heldItems = modelsFolder:FindFirstChild("HeldItems")
+		if heldItems then
+			local template = heldItems:FindFirstChild(itemName)
+			if template then
+				pickup = template:Clone()
+				pickup.Name = "Pickup_" .. itemName
+				if pickup:IsA("Model") then
+					if not pickup.PrimaryPart then
+						for _, p in ipairs(pickup:GetDescendants()) do
+							if p:IsA("BasePart") then pickup.PrimaryPart = p; break end
+						end
+					end
+					for _, p in ipairs(pickup:GetDescendants()) do
+						if p:IsA("BasePart") then p.Anchored = false; p.CanCollide = true end
+					end
+					if pickup.PrimaryPart then
+						pickup:PivotTo(CFrame.new(position))
+					else
+						pickup:Destroy(); pickup = nil
+					end
+				elseif pickup:IsA("BasePart") then
+					pickup.Anchored = false
+					pickup.CanCollide = true
+					pickup.Position = position
+				else
+					pickup:Destroy(); pickup = nil
+				end
+			end
+		end
+	end
+	if not pickup then
+		pickup = Instance.new("Part"); pickup.Name = "Pickup_" .. itemName
+		pickup.Size = Vector3.new(2, 2, 2); pickup.Position = position
+		pickup.Anchored = false; pickup.CanCollide = true
+		pickup.Material = Enum.Material.SmoothPlastic; pickup.Shape = Enum.PartType.Block
+		if itemData.Category == "Resource" then pickup.Color = Color3.fromRGB(139, 105, 65)
+		elseif itemData.Category == "Food" then pickup.Color = Color3.fromRGB(120, 180, 80)
+		else pickup.Color = Color3.fromRGB(160, 160, 160) end
+	end
 	local nameVal = Instance.new("StringValue"); nameVal.Name = "ItemName"; nameVal.Value = itemName; nameVal.Parent = pickup
 	local countVal = Instance.new("IntValue"); countVal.Name = "ItemCount"; countVal.Value = count; countVal.Parent = pickup
 	local pickupTag = Instance.new("StringValue"); pickupTag.Name = "IsPickup"; pickupTag.Value = "true"; pickupTag.Parent = pickup
