@@ -7,7 +7,7 @@ local ItemConfig = require(Modules:WaitForChild("ItemConfig"))
 
 local InventoryManager = {}
 
-local HOTBAR_SLOTS = 6
+local HOTBAR_SLOTS = 9
 local BACKPACK_SLOTS = 18
 local TOTAL_SLOTS = HOTBAR_SLOTS + BACKPACK_SLOTS
 

@@ -36,7 +36,7 @@ local THEME = {
 	SelectedGlow = Color3.fromRGB(255, 210, 50),
 }
 
-local HOTBAR_SIZE = 6
+local HOTBAR_SIZE = 9
 local TOTAL_SLOTS = 24
 local SLOT_SIZE = 52
 local SLOT_PADDING = 8
@@ -76,6 +76,16 @@ local function createHotbar()
 	container.BackgroundTransparency = 1
 	container.BorderSizePixel = 0
 	container.Parent = hotbarGui
+
+	local hotbarBg = Instance.new("ImageLabel")
+	hotbarBg.Name = "HotbarBackground"
+	hotbarBg.Image = "rbxassetid://113413200023574"
+	hotbarBg.ScaleType = Enum.ScaleType.Stretch
+	hotbarBg.BackgroundTransparency = 1
+	hotbarBg.Size = UDim2.new(1, 10, 1, 10)
+	hotbarBg.Position = UDim2.new(0, -5, 0, -5)
+	hotbarBg.ZIndex = 0
+	hotbarBg.Parent = container
 
 	for i = 1, HOTBAR_SIZE do
 		local xPos = 10 + (i - 1) * (SLOT_SIZE + SLOT_PADDING)
@@ -191,7 +201,7 @@ local function createBackpack()
 	backpackGui.Enabled = false
 	backpackGui.Parent = playerGui
 
-	local cols = 6
+	local cols = 9
 	local rows = 3
 	local bpWidth = cols * (SLOT_SIZE + SLOT_PADDING) - SLOT_PADDING + 24
 	local bpHeight = rows * (SLOT_SIZE + SLOT_PADDING) - SLOT_PADDING + 40
@@ -367,6 +377,8 @@ local KEY_TO_SLOT = {
 	[Enum.KeyCode.One] = 1, [Enum.KeyCode.Two] = 2,
 	[Enum.KeyCode.Three] = 3, [Enum.KeyCode.Four] = 4,
 	[Enum.KeyCode.Five] = 5, [Enum.KeyCode.Six] = 6,
+	[Enum.KeyCode.Seven] = 7, [Enum.KeyCode.Eight] = 8,
+	[Enum.KeyCode.Nine] = 9,
 }
 
 UserInputService.InputBegan:Connect(function(input, gp)

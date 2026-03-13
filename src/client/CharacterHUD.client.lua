@@ -124,15 +124,14 @@ local sectionWidth = SECTION_ICONS * ICON_SIZE + (SECTION_ICONS - 1) * ICON_GAP
 local totalWidth   = BAR_PADDING_X * 2 + sectionWidth * 3 + (DIVIDER_MARGIN * 2 + DIVIDER_WIDTH) * 2
 local barHeight    = ICON_SIZE + BAR_PADDING_Y * 2
 
-local statBar = Instance.new("Frame")
+local statBar = Instance.new("ImageLabel")
 statBar.Name = "StatBar"
 statBar.Size = UDim2.new(0, totalWidth, 0, barHeight)
 statBar.Position = UDim2.new(0.5, -totalWidth / 2, 1, -(BAR_BOTTOM_OFFSET + barHeight))
-statBar.BackgroundColor3 = Color3.fromRGB(20, 16, 12)
-statBar.BackgroundTransparency = 0.4
-statBar.BorderSizePixel = 0
+statBar.BackgroundTransparency = 1
+statBar.Image = "rbxassetid://113413200023574"
+statBar.ScaleType = Enum.ScaleType.Stretch
 statBar.Parent = screenGui
-Instance.new("UICorner", statBar).CornerRadius = UDim.new(0, 6)
 
 local healthIcons = {}
 local hungerIcons = {}
