@@ -49,6 +49,10 @@ local overlapParams = OverlapParams.new(); overlapParams.FilterType = Enum.Rayca
 local PLANT_SOUND_ID, INSERT_SOUND_ID = "rbxassetid://9114074523", "rbxassetid://9114074523"
 local isDrinking, drinkProgress, DRINK_DURATION, WATER_HOVER_RANGE = false, 0, 2.0, 8
 local drinkTrack, savedWalkSpeed, holdingE, hoveringWater = nil, 16, false, false
+local hoveredCarryItem = nil
+local carryHighlight = nil
+local carryPromptGui = nil
+local carryPromptFrame = nil
 
 local function updateOverlapFilter()
 	local il = {}
@@ -241,12 +245,64 @@ local function findNearbyCarryItem()
 		if pos then local d = (root.Position-pos).Magnitude; if d < cd then cl = item; cd = d end end end end; return cl
 end
 
+local function createCarryPrompt()
+	carryPromptGui = Instance.new("ScreenGui")
+	carryPromptGui.Name = "CarryPromptGui"
+	carryPromptGui.ResetOnSpawn = false
+	carryPromptGui.Parent = playerGui
+
+	local frame = Instance.new("Frame")
+	frame.Name = "PromptFrame"
+	frame.Size = UDim2.new(0, 160, 0, 30)
+	frame.BackgroundColor3 = Color3.fromRGB(40, 32, 22)
+	frame.BackgroundTransparency = 0.3
+	frame.BorderSizePixel = 0
+	frame.Visible = false
+	frame.Parent = carryPromptGui
+	Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 6)
+
+	local promptLabel = Instance.new("TextLabel")
+	promptLabel.Name = "Label"
+	promptLabel.Size = UDim2.new(1, 0, 1, 0)
+	promptLabel.BackgroundTransparency = 1
+	promptLabel.Text = "[E] Pick up"
+	promptLabel.TextColor3 = Color3.fromRGB(230, 220, 195)
+	promptLabel.TextSize = 12
+	promptLabel.Font = Enum.Font.GothamBold
+	promptLabel.Parent = frame
+
+	return frame
+end
+
+local function getMouseCarryItem()
+	local target = mouse.Target
+	if not target then return nil end
+	local current = target
+	local pf = workspace:FindFirstChild("Pickups")
+	for _ = 1, 4 do
+		if not current then return nil end
+		if current:FindFirstChild("CarryType") then
+			if pf and current.Parent == pf then return current end
+			return nil
+		end
+		current = current.Parent
+	end
+	return nil
+end
+carryPromptFrame = createCarryPrompt()
+
 -- Input
 UserInputService.InputBegan:Connect(function(input, gp)
 	if gp then return end
 	if input.KeyCode == Enum.KeyCode.E then
 		if isDrinking or isCarrying then return end
-		local item = findNearbyCarryItem(); if item then PickupEvent:FireServer(item); return end
+		if hoveredCarryItem and hoveredCarryItem.Parent then
+			PickupEvent:FireServer(hoveredCarryItem)
+			if carryHighlight then carryHighlight:Destroy(); carryHighlight = nil end
+			hoveredCarryItem = nil
+			if carryPromptFrame then carryPromptFrame.Visible = false end
+			return
+		end
 		holdingE = true; if hoveringWater then startDrinking() end
 	end
 	if input.KeyCode == Enum.KeyCode.Q then if isCarrying then DropCarryEvent:FireServer() end end
@@ -273,6 +329,51 @@ RunService.RenderStepped:Connect(function(dt)
 		updateGhost()
 		if gridEnabled then gridUpdateTimer += dt; if gridUpdateTimer >= 0.5 then gridUpdateTimer = 0; hideGrid(); showGrid() end end
 	end
+	-- Carry item hover highlight
+	if not isCarrying and not isDrinking then
+		local carryItem = getMouseCarryItem()
+		if carryItem then
+			local character = player.Character
+			if character and character:FindFirstChild("HumanoidRootPart") then
+				local itemPos
+				if carryItem:IsA("Model") and carryItem.PrimaryPart then itemPos = carryItem.PrimaryPart.Position
+				elseif carryItem:IsA("BasePart") then itemPos = carryItem.Position end
+				if itemPos and (character.HumanoidRootPart.Position - itemPos).Magnitude <= PICKUP_RANGE then
+					if hoveredCarryItem ~= carryItem then
+						if carryHighlight then carryHighlight:Destroy() end
+						carryHighlight = Instance.new("SelectionBox")
+						carryHighlight.Adornee = carryItem
+						carryHighlight.Color3 = Color3.fromRGB(255, 210, 50)
+						carryHighlight.LineThickness = 0.03
+						carryHighlight.SurfaceTransparency = 0.85
+						carryHighlight.SurfaceColor3 = Color3.fromRGB(255, 220, 100)
+						carryHighlight.Parent = carryItem
+						hoveredCarryItem = carryItem
+					end
+					local ctv = carryItem:FindFirstChild("CarryType")
+					local displayName = ctv and ctv.Value or "item"
+					if carryPromptFrame then
+						carryPromptFrame.Visible = true
+						carryPromptFrame.Label.Text = "[E] Carry " .. displayName
+						carryPromptFrame.Position = UDim2.new(0, mouse.X + 16, 0, mouse.Y - 15)
+					end
+				else
+					if carryHighlight then carryHighlight:Destroy(); carryHighlight = nil end
+					hoveredCarryItem = nil
+					if carryPromptFrame then carryPromptFrame.Visible = false end
+				end
+			end
+		else
+			if carryHighlight then carryHighlight:Destroy(); carryHighlight = nil end
+			hoveredCarryItem = nil
+			if carryPromptFrame then carryPromptFrame.Visible = false end
+		end
+	elseif isCarrying then
+		if carryHighlight then carryHighlight:Destroy(); carryHighlight = nil end
+		hoveredCarryItem = nil
+		if carryPromptFrame then carryPromptFrame.Visible = false end
+	end
+
 	if not isCarrying and not isDrinking then
 		hoveringWater = isMouseOverWater()
 		if hoveringWater then wFrame.Visible = true; wFrame.Position = UDim2.new(0, mouse.X+16, 0, mouse.Y-10) else wFrame.Visible = false end
@@ -296,6 +397,10 @@ CarryStateEvent.OnClientEvent:Connect(function(carrying, itemType, plantable)
 	else carryBg.Visible = false end
 end)
 player.CharacterAdded:Connect(function() isCarrying = false; isPlantable = false; isDrinking = false; carryTrack = nil; drinkTrack = nil; holdingE = false
-	destroyGhost(); hideGrid(); hideToolbar(); wFrame.Visible = false; dBarBg.Visible = false end)
+	destroyGhost(); hideGrid(); hideToolbar(); wFrame.Visible = false; dBarBg.Visible = false
+	if carryHighlight then carryHighlight:Destroy(); carryHighlight = nil end
+	hoveredCarryItem = nil
+	if carryPromptFrame then carryPromptFrame.Visible = false end
+end)
 
 print("[CARRY CLIENT] Carry client loaded")
