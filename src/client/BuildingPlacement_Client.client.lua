@@ -1,6 +1,6 @@
 -- BuildingPlacement LocalScript
 -- Location: StarterPlayerScripts > BuildingPlacement
--- Parchment-themed build menu. Semi-transparent, draggable. 3D previews. Sound effects.
+-- Dark teal + gold build menu (unified with HUD aesthetic). 2-column layout.
 -- B = toggle. R/T/G/V placement controls.
 
 local Players = game:GetService("Players")
@@ -8,6 +8,7 @@ local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local SoundService = game:GetService("SoundService")
+local TweenService = game:GetService("TweenService")
 
 local Modules = ReplicatedStorage:WaitForChild("Modules")
 local TerrainConfig = require(Modules:WaitForChild("TerrainConfig"))
@@ -22,14 +23,6 @@ local playerGui = player:WaitForChild("PlayerGui")
 local mouse = player:GetMouse()
 local camera = workspace.CurrentCamera
 
-local UI = {
-	BuildMenuPanel = "rbxassetid://112244832004411",
-	SlotTile       = "rbxassetid://94301633349386",
-	ToolbarPanel   = "rbxassetid://84324990884668",
-	Button         = "rbxassetid://102593938595317",
-	Tooltip        = "rbxassetid://106526935100610",
-}
-
 local SOUNDS = {
 	MenuOpen      = "rbxassetid://97861038165143",
 	MenuClose     = "rbxassetid://110059957735733",
@@ -40,20 +33,37 @@ local SOUNDS = {
 	LockedClick   = "rbxassetid://87519554692663",
 }
 
-local THEME = {
-	TextDark     = Color3.fromRGB(62, 48, 32),
-	TextMedium   = Color3.fromRGB(100, 80, 55),
-	TextLight    = Color3.fromRGB(140, 120, 85),
-	Gold         = Color3.fromRGB(180, 145, 55),
-	GoldDim      = Color3.fromRGB(140, 112, 50),
-	Green        = Color3.fromRGB(70, 150, 65),
-	Red          = Color3.fromRGB(175, 55, 45),
-	CatActive    = Color3.fromRGB(200, 180, 145),
-	CatInactive  = Color3.fromRGB(220, 210, 185),
-	PanelDarker  = Color3.fromRGB(215, 205, 180),
+-- =============================================
+-- PALETTE (unified with CharacterHUD / InventoryClient)
+-- =============================================
+local C = {
+	Panel      = Color3.fromRGB(15, 30, 30),
+	PanelTop   = Color3.fromRGB(18, 36, 36),
+	PanelBot   = Color3.fromRGB(12, 24, 24),
+	SlotTop    = Color3.fromRGB(22, 40, 40),
+	SlotBot    = Color3.fromRGB(14, 30, 30),
+	SlotHover  = Color3.fromRGB(28, 48, 48),
+	Gold       = Color3.fromRGB(184, 148, 62),
+	GoldDim    = Color3.fromRGB(107, 90, 42),
+	GoldTxt    = Color3.fromRGB(212, 184, 106),
+	GoldWarm   = Color3.fromRGB(212, 170, 74),
+	GoldBright = Color3.fromRGB(232, 196, 82),
+	Label      = Color3.fromRGB(138, 154, 138),
+	Key        = Color3.fromRGB(90, 106, 90),
+	Danger     = Color3.fromRGB(160, 64, 40),
+	Green      = Color3.fromRGB(70, 150, 65),
+	IconBg     = Color3.fromRGB(14, 28, 28),
 }
 
-local MENU_TRANSPARENCY = 0.25
+-- =============================================
+-- TWEEN CONFIGS
+-- =============================================
+local tweenOpen    = TweenInfo.new(0.25, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
+local tweenClose   = TweenInfo.new(0.15, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
+local tweenHoverIn = TweenInfo.new(0.15, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
+local tweenHoverOut= TweenInfo.new(0.12, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+local tweenSlide   = TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+local tweenFade    = TweenInfo.new(0.12, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
 
 -- =============================================
 -- UI SOUND PLAYER
@@ -108,9 +118,8 @@ local currentCategory = "All"
 local selectedBuilding = nil
 local searchText = ""
 local gridContainer = nil
-local detailPanel = nil
+local detailStrip = nil
 local categoryButtons = {}
-
 local viewportConnections = {}
 
 -- =============================================
@@ -173,7 +182,9 @@ local function canPlayerBuild(bn)
 	return true, nil
 end
 
--- Grid
+-- =============================================
+-- GRID (world-space placement grid)
+-- =============================================
 local function showGrid()
 	if gridFolder then return end
 	gridFolder = Instance.new("Folder"); gridFolder.Name = "PlacementGrid"; gridFolder.Parent = workspace
@@ -198,7 +209,9 @@ end
 local function hideGrid() gridLines = {}; if gridFolder then gridFolder:Destroy(); gridFolder = nil end end
 local function refreshGrid() hideGrid(); if gridEnabled then showGrid() end end
 
--- Ghost
+-- =============================================
+-- GHOST MODEL
+-- =============================================
 local function createGhost(bn)
 	if ghostModel then ghostModel:Destroy(); ghostModel = nil end
 	local src = nil; local rm = ReplicatedStorage:FindFirstChild("Models")
@@ -251,92 +264,174 @@ local function cleanupViewportConnections()
 end
 
 -- =============================================
--- BUILD MENU
+-- VIEWPORT PREVIEW HELPER
 -- =============================================
-local function updateDetailPanel()
-	if not detailPanel then return end
-	for _, ch in ipairs(detailPanel:GetChildren()) do
-		if not ch:IsA("UIListLayout") and not ch:IsA("UIPadding") then ch:Destroy() end
+local function createViewportPreview(parent, buildingName, size)
+	local config = BuildingConfig.GetBuilding(buildingName)
+	local vpf = Instance.new("ViewportFrame")
+	vpf.Size = size or UDim2.new(1, -8, 1, -28)
+	vpf.Position = UDim2.new(0.5, 0, 0.5, -6)
+	vpf.AnchorPoint = Vector2.new(0.5, 0.5)
+	vpf.BackgroundTransparency = 1
+	vpf.Ambient = Color3.fromRGB(140, 140, 130)
+	vpf.LightColor = Color3.fromRGB(255, 250, 240)
+	vpf.LightDirection = Vector3.new(-1, -1, -1)
+	vpf.ZIndex = 2; vpf.Parent = parent
+
+	local previewModel = nil
+	local repModels = ReplicatedStorage:FindFirstChild("Models")
+	if repModels then
+		local bf = repModels:FindFirstChild("Buildings")
+		if bf then
+			local src = bf:FindFirstChild(buildingName)
+			if src then previewModel = src:Clone(); previewModel.Parent = vpf end
+		end
 	end
+	if not previewModel then
+		previewModel = Instance.new("Model")
+		local box = Instance.new("Part")
+		box.Size = Vector3.new(config.FootprintX or 4, config.FootprintY or 4, config.FootprintZ or 4)
+		box.Color = Color3.fromRGB(180, 140, 80)
+		box.Material = Enum.Material.WoodPlanks; box.Anchored = true
+		box.Parent = previewModel; previewModel.PrimaryPart = box
+		previewModel.Parent = vpf
+	end
+
+	local vpCam = Instance.new("Camera"); vpf.CurrentCamera = vpCam; vpCam.Parent = vpf
+	local modelCF, modelSize = previewModel:GetBoundingBox()
+	local maxDim = math.max(modelSize.X, modelSize.Y, modelSize.Z)
+	local camDist = maxDim * 1.6
+	local center = modelCF.Position
+	local angle = math.rad(35)
+	vpCam.CFrame = CFrame.new(
+		center + Vector3.new(math.cos(angle) * camDist * 0.8, camDist * 0.5, math.sin(angle) * camDist * 0.8),
+		center
+	)
+	return vpf
+end
+
+-- =============================================
+-- BUILD MENU — DETAIL STRIP (bottom overlay)
+-- =============================================
+local SIDEBAR_W = 85
+local STRIP_H = 80
+
+local function updateDetailStrip()
+	if not detailStrip then return end
+	for _, ch in ipairs(detailStrip:GetChildren()) do
+		if not ch:IsA("UICorner") and ch.Name ~= "StripDivider" then ch:Destroy() end
+	end
+
 	if not selectedBuilding then
-		local h = Instance.new("TextLabel"); h.Size = UDim2.new(1,0,0,60); h.BackgroundTransparency = 1
-		h.Text = "Select a building\nfrom the list"; h.TextColor3 = THEME.TextLight
-		h.TextSize = 13; h.Font = Enum.Font.Gotham; h.TextWrapped = true
-		h.LayoutOrder = 1; h.Parent = detailPanel; return
+		TweenService:Create(detailStrip, tweenSlide, {Size = UDim2.new(1, -2, 0, 0)}):Play()
+		if gridContainer then
+			TweenService:Create(gridContainer, tweenSlide, {Size = UDim2.new(1, -(SIDEBAR_W + 16 + 8), 1, -52)}):Play()
+		end
+		return
 	end
+
 	local config = BuildingConfig.GetBuilding(selectedBuilding); if not config then return end
 	local cb, lr = canPlayerBuild(selectedBuilding)
 
-	local nl = Instance.new("TextLabel"); nl.Size = UDim2.new(1,0,0,22); nl.BackgroundTransparency = 1
-	nl.Text = config.DisplayName; nl.TextColor3 = cb and THEME.TextDark or THEME.TextLight
-	nl.TextSize = 15; nl.Font = Enum.Font.GothamBold; nl.TextXAlignment = Enum.TextXAlignment.Left
-	nl.LayoutOrder = 1; nl.Parent = detailPanel
-
-	local cl = Instance.new("TextLabel"); cl.Size = UDim2.new(1,0,0,14); cl.BackgroundTransparency = 1
-	cl.Text = config.Category; cl.TextColor3 = THEME.GoldDim; cl.TextSize = 10; cl.Font = Enum.Font.Gotham
-	cl.TextXAlignment = Enum.TextXAlignment.Left; cl.LayoutOrder = 2; cl.Parent = detailPanel
-
-	local s1 = Instance.new("Frame"); s1.Size = UDim2.new(1,0,0,1); s1.BackgroundColor3 = THEME.GoldDim
-	s1.BackgroundTransparency = 0.5; s1.BorderSizePixel = 0; s1.LayoutOrder = 3; s1.Parent = detailPanel
-
-	local dl = Instance.new("TextLabel"); dl.Size = UDim2.new(1,0,0,40); dl.BackgroundTransparency = 1
-	dl.Text = config.Description or ""; dl.TextColor3 = THEME.TextMedium; dl.TextSize = 10
-	dl.Font = Enum.Font.Gotham; dl.TextWrapped = true; dl.TextYAlignment = Enum.TextYAlignment.Top
-	dl.TextXAlignment = Enum.TextXAlignment.Left; dl.LayoutOrder = 4; dl.Parent = detailPanel
-
-	local chdr = Instance.new("TextLabel"); chdr.Size = UDim2.new(1,0,0,14); chdr.BackgroundTransparency = 1
-	chdr.Text = "COST"; chdr.TextColor3 = THEME.Gold; chdr.TextSize = 10; chdr.Font = Enum.Font.GothamBold
-	chdr.TextXAlignment = Enum.TextXAlignment.Left; chdr.LayoutOrder = 5; chdr.Parent = detailPanel
-
-	if config.Cost and next(config.Cost) then
-		local co = 6; local sorted = {}
-		for item, count in pairs(config.Cost) do table.insert(sorted, {I=item,C=count}) end
-		table.sort(sorted, function(a,b) return a.I < b.I end)
-		for _, e in ipairs(sorted) do
-			local r = Instance.new("TextLabel"); r.Size = UDim2.new(1,0,0,13); r.BackgroundTransparency = 1
-			r.Text = "  "..e.C.."x "..e.I; r.TextColor3 = THEME.TextMedium; r.TextSize = 10; r.Font = Enum.Font.Gotham
-			r.TextXAlignment = Enum.TextXAlignment.Left; r.LayoutOrder = co; r.Parent = detailPanel; co += 1
-		end
+	TweenService:Create(detailStrip, tweenSlide, {Size = UDim2.new(1, -2, 0, STRIP_H)}):Play()
+	if gridContainer then
+		TweenService:Create(gridContainer, tweenSlide, {Size = UDim2.new(1, -(SIDEBAR_W + 16 + 8), 1, -52 - STRIP_H - 4)}):Play()
 	end
 
-	local rh = Instance.new("TextLabel"); rh.Size = UDim2.new(1,0,0,14); rh.BackgroundTransparency = 1
-	rh.Text = "REQUIRES"; rh.TextColor3 = THEME.Gold; rh.TextSize = 10; rh.Font = Enum.Font.GothamBold
-	rh.TextXAlignment = Enum.TextXAlignment.Left; rh.LayoutOrder = 20; rh.Parent = detailPanel
+	-- Divider at top
+	local div = Instance.new("Frame")
+	div.Name = "StripDivider"
+	div.Size = UDim2.new(1, -16, 0, 1)
+	div.Position = UDim2.new(0, 8, 0, 1)
+	div.BackgroundColor3 = C.GoldDim
+	div.BackgroundTransparency = 0.4
+	div.BorderSizePixel = 0
+	div.Parent = detailStrip
 
-	local rt = BuildingConfig.GetRequirementString(selectedBuilding)
-	local rl = Instance.new("TextLabel"); rl.Size = UDim2.new(1,0,0,13); rl.BackgroundTransparency = 1
-	rl.Text = "  "..rt; rl.TextColor3 = cb and THEME.Green or THEME.Red; rl.TextSize = 10; rl.Font = Enum.Font.Gotham
-	rl.TextXAlignment = Enum.TextXAlignment.Left; rl.LayoutOrder = 21; rl.Parent = detailPanel
+	-- Viewport preview (left)
+	local vpWrap = Instance.new("Frame")
+	vpWrap.Size = UDim2.new(0, 62, 0, 62)
+	vpWrap.Position = UDim2.new(0, 10, 0.5, -31)
+	vpWrap.AnchorPoint = Vector2.new(0, 0)
+	vpWrap.BackgroundColor3 = C.IconBg
+	vpWrap.BorderSizePixel = 0
+	vpWrap.Parent = detailStrip
+	Instance.new("UICorner", vpWrap).CornerRadius = UDim.new(0, 6)
+	local vpStroke = Instance.new("UIStroke"); vpStroke.Color = C.GoldDim; vpStroke.Thickness = 1; vpStroke.Parent = vpWrap
+	createViewportPreview(vpWrap, selectedBuilding, UDim2.new(1, -4, 1, -4))
 
-	if not cb and lr then
-		local ll = Instance.new("TextLabel"); ll.Size = UDim2.new(1,0,0,13); ll.BackgroundTransparency = 1
-		ll.Text = "  "..lr; ll.TextColor3 = THEME.Red; ll.TextSize = 9; ll.Font = Enum.Font.GothamBold
-		ll.TextXAlignment = Enum.TextXAlignment.Left; ll.LayoutOrder = 22; ll.Parent = detailPanel
-	end
+	-- Info (middle)
+	local infoX = 82
+	local nameLabel = Instance.new("TextLabel")
+	nameLabel.Size = UDim2.new(1, -(infoX + 130), 0, 20)
+	nameLabel.Position = UDim2.new(0, infoX, 0, 6)
+	nameLabel.BackgroundTransparency = 1
+	nameLabel.Text = config.DisplayName
+	nameLabel.TextColor3 = cb and C.GoldTxt or C.Key
+	nameLabel.TextSize = 14; nameLabel.Font = Enum.Font.GothamBold
+	nameLabel.TextXAlignment = Enum.TextXAlignment.Left
+	nameLabel.Parent = detailStrip
 
-	local s2 = Instance.new("Frame"); s2.Size = UDim2.new(1,0,0,1); s2.BackgroundColor3 = THEME.GoldDim
-	s2.BackgroundTransparency = 0.5; s2.BorderSizePixel = 0; s2.LayoutOrder = 30; s2.Parent = detailPanel
+	local descLabel = Instance.new("TextLabel")
+	descLabel.Size = UDim2.new(1, -(infoX + 130), 0, 14)
+	descLabel.Position = UDim2.new(0, infoX, 0, 26)
+	descLabel.BackgroundTransparency = 1
+	descLabel.Text = config.Description or ""
+	descLabel.TextColor3 = C.Label
+	descLabel.TextSize = 10; descLabel.Font = Enum.Font.Gotham
+	descLabel.TextXAlignment = Enum.TextXAlignment.Left
+	descLabel.TextTruncate = Enum.TextTruncate.AtEnd
+	descLabel.Parent = detailStrip
 
-	local pb = Instance.new("ImageButton"); pb.Size = UDim2.new(1,0,0,32)
-	pb.BackgroundTransparency = 1; pb.Image = UI.Button; pb.ScaleType = Enum.ScaleType.Stretch
-	pb.LayoutOrder = 31; pb.Parent = detailPanel
-	local bt = Instance.new("TextLabel"); bt.Size = UDim2.new(1,0,1,0); bt.BackgroundTransparency = 1
-	bt.Font = Enum.Font.GothamBold; bt.TextSize = 13; bt.Parent = pb
+	local costLabel = Instance.new("TextLabel")
+	costLabel.Size = UDim2.new(1, -(infoX + 130), 0, 14)
+	costLabel.Position = UDim2.new(0, infoX, 0, 44)
+	costLabel.BackgroundTransparency = 1
+	costLabel.Text = "Cost: " .. BuildingConfig.GetCostString(selectedBuilding)
+	costLabel.TextColor3 = C.GoldDim
+	costLabel.TextSize = 10; costLabel.Font = Enum.Font.Gotham
+	costLabel.TextXAlignment = Enum.TextXAlignment.Left
+	costLabel.Parent = detailStrip
+
+	local reqLabel = Instance.new("TextLabel")
+	reqLabel.Size = UDim2.new(1, -(infoX + 130), 0, 14)
+	reqLabel.Position = UDim2.new(0, infoX, 0, 58)
+	reqLabel.BackgroundTransparency = 1
+	reqLabel.Text = "Requires: " .. BuildingConfig.GetRequirementString(selectedBuilding)
+	reqLabel.TextColor3 = cb and C.Green or C.Danger
+	reqLabel.TextSize = 10; reqLabel.Font = Enum.Font.Gotham
+	reqLabel.TextXAlignment = Enum.TextXAlignment.Left
+	reqLabel.Parent = detailStrip
+
+	-- Place button (right)
+	local placeBtn = Instance.new("TextButton")
+	placeBtn.Size = UDim2.new(0, 110, 0, 36)
+	placeBtn.Position = UDim2.new(1, -120, 0.5, -18)
+	placeBtn.BackgroundColor3 = cb and C.Gold or C.Key
+	placeBtn.BorderSizePixel = 0
+	placeBtn.TextColor3 = cb and C.Panel or C.Label
+	placeBtn.TextSize = 13; placeBtn.Font = Enum.Font.GothamBold
+	placeBtn.Text = cb and "Place Blueprint" or "Locked"
+	placeBtn.AutoButtonColor = cb
+	placeBtn.Parent = detailStrip
+	Instance.new("UICorner", placeBtn).CornerRadius = UDim.new(0, 6)
+
 	if cb then
-		bt.Text = "Place Blueprint"; bt.TextColor3 = Color3.new(1,1,1)
-		pb.MouseButton1Click:Connect(function()
+		placeBtn.MouseButton1Click:Connect(function()
 			playUISound(SOUNDS.PlaceClick, 0.5)
 			closeBuildMenu()
 			startPlacement(selectedBuilding)
 		end)
 	else
-		bt.Text = "Locked"; bt.TextColor3 = THEME.TextLight; pb.ImageTransparency = 0.4
-		pb.MouseButton1Click:Connect(function()
+		placeBtn.MouseButton1Click:Connect(function()
 			playUISound(SOUNDS.LockedClick, 0.5)
 		end)
 	end
 end
 
+-- =============================================
+-- BUILD MENU — GRID TILES
+-- =============================================
 local function populateGrid()
 	if not gridContainer then return end
 	cleanupViewportConnections()
@@ -349,8 +444,8 @@ local function populateGrid()
 	if searchText ~= "" then
 		local f = {}; local lo = string.lower(searchText)
 		for _, n in ipairs(names) do
-			local c = BuildingConfig.GetBuilding(n)
-			if c and string.find(string.lower(c.DisplayName), lo, 1, true) then table.insert(f, n) end
+			local cfg = BuildingConfig.GetBuilding(n)
+			if cfg and string.find(string.lower(cfg.DisplayName), lo, 1, true) then table.insert(f, n) end
 		end
 		names = f
 	end
@@ -359,29 +454,36 @@ local function populateGrid()
 		local config = BuildingConfig.GetBuilding(name); if not config then continue end
 		local cb = canPlayerBuild(name)
 
-		local tile = Instance.new("ImageButton"); tile.Name = name
-		tile.Size = UDim2.new(0,1,0,1); tile.BackgroundTransparency = 1
-		tile.Image = UI.SlotTile; tile.ScaleType = Enum.ScaleType.Stretch
-		tile.ImageTransparency = cb and 0 or 0.3
+		local tile = Instance.new("TextButton"); tile.Name = name
+		tile.Size = UDim2.new(0, 1, 0, 1)
+		tile.BackgroundColor3 = C.SlotTop
+		tile.BorderSizePixel = 0
+		tile.Text = ""
+		tile.AutoButtonColor = false
 		tile.LayoutOrder = i; tile.Parent = gridContainer
+		Instance.new("UICorner", tile).CornerRadius = UDim.new(0, 7)
 
+		local stroke = Instance.new("UIStroke"); stroke.Parent = tile
+		stroke.Color = (name == selectedBuilding) and C.GoldWarm or C.GoldDim
+		stroke.Thickness = (name == selectedBuilding) and 2 or 1
+		stroke.Transparency = cb and 0 or 0.5
+
+		if not cb then tile.BackgroundTransparency = 0.3 end
+
+		-- 3D preview (static angle)
+		createViewportPreview(tile, name)
+
+		-- Name label at bottom
 		local nl = Instance.new("TextLabel")
-		nl.Size = UDim2.new(1, -8, 0, 16); nl.Position = UDim2.new(0, 4, 0, 4)
-		nl.BackgroundTransparency = 1; nl.Text = config.DisplayName
-		nl.TextColor3 = cb and THEME.TextDark or THEME.TextLight
+		nl.Size = UDim2.new(1, -8, 0, 18)
+		nl.Position = UDim2.new(0, 4, 1, -22)
+		nl.BackgroundTransparency = 1
+		nl.Text = config.DisplayName
+		nl.TextColor3 = cb and C.GoldTxt or C.Key
 		nl.TextSize = 10; nl.Font = Enum.Font.GothamBold
-		nl.TextXAlignment = Enum.TextXAlignment.Left
+		nl.TextXAlignment = Enum.TextXAlignment.Center
 		nl.TextTruncate = Enum.TextTruncate.AtEnd
 		nl.ZIndex = 3; nl.Parent = tile
-
-		local cl = Instance.new("TextLabel")
-		cl.Size = UDim2.new(1, -8, 0, 12); cl.Position = UDim2.new(0, 4, 1, -16)
-		cl.BackgroundTransparency = 1; cl.Text = BuildingConfig.GetCostString(name)
-		cl.TextColor3 = cb and THEME.TextMedium or THEME.TextLight
-		cl.TextSize = 9; cl.Font = Enum.Font.Gotham
-		cl.TextXAlignment = Enum.TextXAlignment.Left
-		cl.TextTruncate = Enum.TextTruncate.AtEnd
-		cl.ZIndex = 3; cl.Parent = tile
 
 		if not cb then
 			local li = Instance.new("TextLabel")
@@ -390,73 +492,26 @@ local function populateGrid()
 			li.ZIndex = 4; li.Parent = tile
 		end
 
-		if name == selectedBuilding then
-			local sel = Instance.new("UIStroke"); sel.Color = THEME.Gold; sel.Thickness = 2; sel.Parent = tile
-		end
-
-		-- 3D Viewport preview
-		local vpf = Instance.new("ViewportFrame")
-		vpf.Size = UDim2.new(0, 75, 0, 75)
-		vpf.Position = UDim2.new(0.5, -37, 0.5, -30)
-		vpf.BackgroundTransparency = 1
-		vpf.Ambient = Color3.fromRGB(180, 170, 150)
-		vpf.LightColor = Color3.fromRGB(255, 250, 240)
-		vpf.LightDirection = Vector3.new(-1, -1, -1)
-		vpf.ZIndex = 2; vpf.Parent = tile
-
-		local previewModel = nil
-		local repModels = ReplicatedStorage:FindFirstChild("Models")
-		if repModels then
-			local bf = repModels:FindFirstChild("Buildings")
-			if bf then
-				local src = bf:FindFirstChild(name)
-				if src then previewModel = src:Clone(); previewModel.Parent = vpf end
-			end
-		end
-
-		if not previewModel then
-			previewModel = Instance.new("Model")
-			local box = Instance.new("Part")
-			box.Size = Vector3.new(config.FootprintX or 4, config.FootprintY or 4, config.FootprintZ or 4)
-			box.Color = Color3.fromRGB(180, 140, 80)
-			box.Material = Enum.Material.WoodPlanks; box.Anchored = true
-			box.Parent = previewModel; previewModel.PrimaryPart = box
-			previewModel.Parent = vpf
-		end
-
-		local vpCam = Instance.new("Camera"); vpf.CurrentCamera = vpCam; vpCam.Parent = vpf
-		local modelCF, modelSize = previewModel:GetBoundingBox()
-		local maxDim = math.max(modelSize.X, modelSize.Y, modelSize.Z)
-		local camDist = maxDim * 1.5
-		local center = modelCF.Position
-		local angle = math.rad(i * 45)
-
-		vpCam.CFrame = CFrame.new(
-			center + Vector3.new(math.cos(angle) * camDist * 0.8, camDist * 0.5, math.sin(angle) * camDist * 0.8),
-			center
-		)
-
-		local rotConn = RunService.Heartbeat:Connect(function(dt)
-			if not vpf.Parent then return end
-			angle = angle + dt * 0.5
-			vpCam.CFrame = CFrame.new(
-				center + Vector3.new(math.cos(angle) * camDist * 0.8, camDist * 0.5, math.sin(angle) * camDist * 0.8),
-				center
-			)
-		end)
-		table.insert(viewportConnections, rotConn)
-
-		-- SOUND: hover
+		-- Hover animation
 		tile.MouseEnter:Connect(function()
 			playUISound(SOUNDS.TileHover, 0.2)
+			if name ~= selectedBuilding then
+				TweenService:Create(tile, tweenHoverIn, {BackgroundColor3 = C.SlotHover}):Play()
+				TweenService:Create(stroke, tweenHoverIn, {Color = C.Gold}):Play()
+			end
+		end)
+		tile.MouseLeave:Connect(function()
+			if name ~= selectedBuilding then
+				TweenService:Create(tile, tweenHoverOut, {BackgroundColor3 = C.SlotTop}):Play()
+				TweenService:Create(stroke, tweenHoverOut, {Color = C.GoldDim}):Play()
+			end
 		end)
 
-		-- SOUND: click
 		tile.MouseButton1Click:Connect(function()
 			playUISound(SOUNDS.TileClick, 0.4)
 			selectedBuilding = name
 			populateGrid()
-			updateDetailPanel()
+			updateDetailStrip()
 		end)
 	end
 
@@ -466,137 +521,131 @@ end
 
 local function updateCategoryHighlights()
 	for key, btn in pairs(categoryButtons) do
-		if key == currentCategory then btn.BackgroundColor3 = THEME.CatActive; btn.TextColor3 = THEME.TextDark
-		else btn.BackgroundColor3 = THEME.CatInactive; btn.TextColor3 = THEME.TextMedium end
+		if key == currentCategory then
+			TweenService:Create(btn, tweenFade, {BackgroundColor3 = C.SlotHover, BackgroundTransparency = 0}):Play()
+			btn.TextColor3 = C.GoldTxt
+		else
+			TweenService:Create(btn, tweenFade, {BackgroundColor3 = C.SlotTop, BackgroundTransparency = 0.3}):Play()
+			btn.TextColor3 = C.Label
+		end
 	end
 end
 
+-- =============================================
+-- BUILD MENU — OPEN / CLOSE
+-- =============================================
 local function openBuildMenu()
 	if menuOpen then closeBuildMenu(); return end
 	if isPlacing then return end
 	menuOpen = true; selectedBuilding = nil
 
-	-- SOUND: menu open
 	playUISound(SOUNDS.MenuOpen, 0.5)
 
 	menuGui = Instance.new("ScreenGui"); menuGui.Name = "BuildMenu"; menuGui.ResetOnSpawn = false; menuGui.Parent = playerGui
 
-	local MENU_W, MENU_H = 680, 440
-
-	local screenSize = camera.ViewportSize
-	local startX = math.floor((screenSize.X - MENU_W) / 2)
-	local startY = math.floor((screenSize.Y - MENU_H) / 2)
-
-	local main = Instance.new("Frame"); main.Name = "Main"
-	main.Size = UDim2.new(0, MENU_W, 0, MENU_H)
-	main.Position = UDim2.new(0, startX, 0, startY)
-	main.BackgroundTransparency = 1; main.BorderSizePixel = 0
+	-- Main container (CanvasGroup for group fade)
+	local main = Instance.new("CanvasGroup"); main.Name = "Main"
+	main.Size = UDim2.new(0.5, 0, 0.6, 0)
+	main.Position = UDim2.new(0.25, 0, 0.15, 0)
+	main.BackgroundColor3 = C.Panel
+	main.BorderSizePixel = 0
 	main.Parent = menuGui
+	Instance.new("UICorner", main).CornerRadius = UDim.new(0, 10)
 
-	local mainBg = Instance.new("ImageLabel"); mainBg.Name = "PanelBg"
-	mainBg.Size = UDim2.new(1, 0, 1, 0)
-	mainBg.BackgroundTransparency = 1
-	mainBg.Image = UI.BuildMenuPanel
-	mainBg.ScaleType = Enum.ScaleType.Stretch
-	mainBg.ImageTransparency = MENU_TRANSPARENCY
-	mainBg.ZIndex = 0; mainBg.Parent = main
+	local sizeC = Instance.new("UISizeConstraint"); sizeC.MinSize = Vector2.new(500, 340); sizeC.MaxSize = Vector2.new(780, 520); sizeC.Parent = main
 
-	-- === TOP BAR (drag handle) ===
+	local outerStroke = Instance.new("UIStroke"); outerStroke.Color = C.GoldDim; outerStroke.Thickness = 2; outerStroke.Parent = main
+
+	-- Gold highlight at top edge
+	local topHL = Instance.new("Frame")
+	topHL.Size = UDim2.new(1, -20, 0, 2); topHL.Position = UDim2.new(0, 10, 0, 0)
+	topHL.BackgroundColor3 = C.Gold; topHL.BackgroundTransparency = 0.4; topHL.BorderSizePixel = 0; topHL.Parent = main
+
+	-- === TOP BAR ===
 	local topBar = Instance.new("TextButton"); topBar.Name = "TopBar"
-	topBar.Size = UDim2.new(1, -24, 0, 36); topBar.Position = UDim2.new(0, 12, 0, 10)
-	topBar.BackgroundColor3 = THEME.PanelDarker; topBar.BackgroundTransparency = 0.85
+	topBar.Size = UDim2.new(1, -16, 0, 36); topBar.Position = UDim2.new(0, 8, 0, 6)
+	topBar.BackgroundColor3 = C.PanelTop; topBar.BackgroundTransparency = 0.5
 	topBar.BorderSizePixel = 0; topBar.Text = ""; topBar.AutoButtonColor = false
 	topBar.Parent = main
 	Instance.new("UICorner", topBar).CornerRadius = UDim.new(0, 8)
 
-	-- Drag logic
-	local dragging = false
-	local dragStart = nil
-	local startPos = nil
+	-- Drag
+	local dragging = false; local dragStart, startPos
 
 	topBar.InputBegan:Connect(function(input)
 		if input.UserInputType == Enum.UserInputType.MouseButton1 then
-			dragging = true
-			dragStart = input.Position
-			startPos = main.Position
+			dragging = true; dragStart = input.Position; startPos = main.Position
 		end
 	end)
-
 	topBar.InputEnded:Connect(function(input)
-		if input.UserInputType == Enum.UserInputType.MouseButton1 then
-			dragging = false
-		end
+		if input.UserInputType == Enum.UserInputType.MouseButton1 then dragging = false end
 	end)
-
 	UserInputService.InputChanged:Connect(function(input)
 		if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
 			local delta = input.Position - dragStart
-			local newX = startPos.X.Offset + delta.X
-			local newY = startPos.Y.Offset + delta.Y
-
-			local vs = camera.ViewportSize
-			local PAD = 80
-			newX = math.clamp(newX, PAD - MENU_W, vs.X - PAD)
-			newY = math.clamp(newY, 0, vs.Y - PAD)
-
-			main.Position = UDim2.new(0, newX, 0, newY)
+			main.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
 		end
 	end)
 
 	-- Title
-	local tl = Instance.new("TextLabel"); tl.Size = UDim2.new(0, 70, 1, 0); tl.Position = UDim2.new(0, 10, 0, 0)
-	tl.BackgroundTransparency = 1; tl.Text = "BUILD"; tl.TextColor3 = THEME.TextDark
-	tl.TextSize = 16; tl.Font = Enum.Font.GothamBold; tl.TextXAlignment = Enum.TextXAlignment.Left; tl.Parent = topBar
+	local tl = Instance.new("TextLabel")
+	tl.Size = UDim2.new(0, 80, 1, 0); tl.Position = UDim2.new(0, 10, 0, 0)
+	tl.BackgroundTransparency = 1; tl.Text = "BUILD"
+	tl.TextColor3 = C.GoldTxt; tl.TextSize = 16; tl.Font = Enum.Font.GothamBold
+	tl.TextXAlignment = Enum.TextXAlignment.Left; tl.Parent = topBar
 
 	local dragHint = Instance.new("TextLabel")
-	dragHint.Size = UDim2.new(0, 100, 0, 12); dragHint.Position = UDim2.new(0, 10, 1, -14)
-	dragHint.BackgroundTransparency = 1; dragHint.Text = "— drag to move —"
-	dragHint.TextColor3 = THEME.TextLight; dragHint.TextSize = 8; dragHint.Font = Enum.Font.Gotham
+	dragHint.Size = UDim2.new(0, 80, 0, 10); dragHint.Position = UDim2.new(0, 10, 1, -12)
+	dragHint.BackgroundTransparency = 1; dragHint.Text = "drag to move"
+	dragHint.TextColor3 = C.Key; dragHint.TextSize = 8; dragHint.Font = Enum.Font.Gotham
 	dragHint.TextXAlignment = Enum.TextXAlignment.Left; dragHint.Parent = topBar
 
 	-- Search box
-	local sf = Instance.new("Frame"); sf.Size = UDim2.new(0, 200, 0, 24)
-	sf.Position = UDim2.new(0.5, -100, 0.5, -12)
-	sf.BackgroundColor3 = Color3.fromRGB(250, 245, 232); sf.BackgroundTransparency = 0.3
-	sf.BorderSizePixel = 0; sf.Parent = topBar
+	local sf = Instance.new("Frame")
+	sf.Size = UDim2.new(0, 180, 0, 24); sf.Position = UDim2.new(0.5, -90, 0.5, -12)
+	sf.BackgroundColor3 = C.IconBg; sf.BackgroundTransparency = 0.3; sf.BorderSizePixel = 0; sf.Parent = topBar
 	Instance.new("UICorner", sf).CornerRadius = UDim.new(0, 6)
+	local sfStroke = Instance.new("UIStroke"); sfStroke.Color = C.GoldDim; sfStroke.Thickness = 1; sfStroke.Parent = sf
 
-	local sb = Instance.new("TextBox"); sb.Size = UDim2.new(1, -8, 1, 0); sb.Position = UDim2.new(0, 4, 0, 0)
+	local sb = Instance.new("TextBox")
+	sb.Size = UDim2.new(1, -8, 1, 0); sb.Position = UDim2.new(0, 4, 0, 0)
 	sb.BackgroundTransparency = 1; sb.Text = ""
-	sb.PlaceholderText = "Search buildings..."; sb.PlaceholderColor3 = THEME.TextLight
-	sb.TextColor3 = THEME.TextDark; sb.TextSize = 11; sb.Font = Enum.Font.Gotham
+	sb.PlaceholderText = "Search..."; sb.PlaceholderColor3 = C.Key
+	sb.TextColor3 = C.GoldTxt; sb.TextSize = 11; sb.Font = Enum.Font.Gotham
 	sb.ClearTextOnFocus = false; sb.Parent = sf
 	sb:GetPropertyChangedSignal("Text"):Connect(function() searchText = sb.Text; populateGrid() end)
 
 	-- Close button
-	local xBtn = Instance.new("TextButton"); xBtn.Size = UDim2.new(0, 28, 0, 28)
-	xBtn.Position = UDim2.new(1, -32, 0.5, -14)
-	xBtn.BackgroundColor3 = THEME.Red; xBtn.TextColor3 = Color3.new(1, 1, 1)
-	xBtn.TextSize = 14; xBtn.Font = Enum.Font.GothamBold; xBtn.Text = "X"; xBtn.Parent = topBar
+	local xBtn = Instance.new("TextButton")
+	xBtn.Size = UDim2.new(0, 28, 0, 28); xBtn.Position = UDim2.new(1, -32, 0.5, -14)
+	xBtn.BackgroundColor3 = C.Danger; xBtn.BorderSizePixel = 0
+	xBtn.TextColor3 = Color3.new(1, 1, 1); xBtn.TextSize = 14; xBtn.Font = Enum.Font.GothamBold; xBtn.Text = "X"
+	xBtn.Parent = topBar
 	Instance.new("UICorner", xBtn).CornerRadius = UDim.new(0, 6)
 	xBtn.MouseButton1Click:Connect(function() closeBuildMenu() end)
 
-	-- Sidebar
-	local SIDEBAR_W = 100
+	-- === SIDEBAR ===
 	local sidebar = Instance.new("ScrollingFrame")
-	sidebar.Size = UDim2.new(0, SIDEBAR_W, 1, -58); sidebar.Position = UDim2.new(0, 11, 0, 50)
-	sidebar.BackgroundColor3 = THEME.PanelDarker; sidebar.BackgroundTransparency = 0.85
+	sidebar.Size = UDim2.new(0, SIDEBAR_W, 1, -52); sidebar.Position = UDim2.new(0, 8, 0, 44)
+	sidebar.BackgroundColor3 = C.PanelTop; sidebar.BackgroundTransparency = 0.5
 	sidebar.BorderSizePixel = 0; sidebar.ScrollBarThickness = 0
 	sidebar.CanvasSize = UDim2.new(0, 0, 0, 0); sidebar.AutomaticCanvasSize = Enum.AutomaticSize.Y
 	sidebar.Parent = main
 	Instance.new("UICorner", sidebar).CornerRadius = UDim.new(0, 6)
 
 	local sLayout = Instance.new("UIListLayout", sidebar); sLayout.SortOrder = Enum.SortOrder.LayoutOrder; sLayout.Padding = UDim.new(0, 2)
-	local sPad = Instance.new("UIPadding", sidebar); sPad.PaddingTop = UDim.new(0, 4); sPad.PaddingBottom = UDim.new(0, 4)
+	local sPad = Instance.new("UIPadding", sidebar)
+	sPad.PaddingTop = UDim.new(0, 4); sPad.PaddingBottom = UDim.new(0, 4)
 	sPad.PaddingLeft = UDim.new(0, 4); sPad.PaddingRight = UDim.new(0, 4)
 
 	categoryButtons = {}
 	for i, cat in ipairs(BuildingConfig.Categories) do
-		local btn = Instance.new("TextButton"); btn.Size = UDim2.new(1, 0, 0, 28)
-		btn.BackgroundColor3 = THEME.CatInactive; btn.BorderSizePixel = 0
-		btn.TextColor3 = THEME.TextMedium; btn.TextSize = 11; btn.Font = Enum.Font.GothamBold
+		local btn = Instance.new("TextButton")
+		btn.Size = UDim2.new(1, 0, 0, 28)
+		btn.BackgroundColor3 = C.SlotTop; btn.BackgroundTransparency = 0.3; btn.BorderSizePixel = 0
+		btn.TextColor3 = C.Label; btn.TextSize = 11; btn.Font = Enum.Font.GothamBold
 		btn.Text = cat.DisplayName; btn.TextXAlignment = Enum.TextXAlignment.Left
-		btn.LayoutOrder = i; btn.Parent = sidebar
+		btn.AutoButtonColor = false; btn.LayoutOrder = i; btn.Parent = sidebar
 		Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 4)
 		Instance.new("UIPadding", btn).PaddingLeft = UDim.new(0, 6)
 		categoryButtons[cat.Key] = btn
@@ -609,61 +658,76 @@ local function openBuildMenu()
 	end
 	updateCategoryHighlights()
 
-	-- Center grid
-	local GRID_X = SIDEBAR_W + 22
-	local GRID_W = MENU_W - SIDEBAR_W - 220
+	-- === CENTER GRID ===
+	local GRID_X = SIDEBAR_W + 16
 	gridContainer = Instance.new("ScrollingFrame")
-	gridContainer.Size = UDim2.new(0, GRID_W, 1, -58); gridContainer.Position = UDim2.new(0, GRID_X, 0, 50)
+	gridContainer.Size = UDim2.new(1, -(GRID_X + 8), 1, -52)
+	gridContainer.Position = UDim2.new(0, GRID_X, 0, 44)
 	gridContainer.BackgroundTransparency = 1; gridContainer.BorderSizePixel = 0
-	gridContainer.ScrollBarThickness = 4; gridContainer.ScrollBarImageColor3 = THEME.GoldDim
+	gridContainer.ScrollBarThickness = 4; gridContainer.ScrollBarImageColor3 = C.GoldDim
 	gridContainer.Parent = main
 
 	local gLayout = Instance.new("UIGridLayout", gridContainer)
-	gLayout.CellSize = UDim2.new(0, 130, 0, 130); gLayout.CellPadding = UDim2.new(0, 5, 0, 5)
+	gLayout.CellSize = UDim2.new(0, 100, 0, 100); gLayout.CellPadding = UDim2.new(0, 6, 0, 6)
 	gLayout.SortOrder = Enum.SortOrder.LayoutOrder
 	local gPad = Instance.new("UIPadding", gridContainer)
 	gPad.PaddingTop = UDim.new(0, 4); gPad.PaddingLeft = UDim.new(0, 4); gPad.PaddingRight = UDim.new(0, 4)
 	populateGrid()
 
-	-- Right detail panel
-	local DETAIL_W = 180
-	detailPanel = Instance.new("ScrollingFrame")
-	detailPanel.Size = UDim2.new(0, DETAIL_W, 1, -58)
-	detailPanel.Position = UDim2.new(1, -(DETAIL_W + 14), 0, 50)
-	detailPanel.BackgroundColor3 = THEME.PanelDarker; detailPanel.BackgroundTransparency = 0.85
-	detailPanel.BorderSizePixel = 0; detailPanel.ScrollBarThickness = 3
-	detailPanel.ScrollBarImageColor3 = THEME.GoldDim
-	detailPanel.AutomaticCanvasSize = Enum.AutomaticSize.Y; detailPanel.Parent = main
-	Instance.new("UICorner", detailPanel).CornerRadius = UDim.new(0, 6)
+	-- === DETAIL STRIP (bottom, starts collapsed) ===
+	detailStrip = Instance.new("Frame"); detailStrip.Name = "DetailStrip"
+	detailStrip.Size = UDim2.new(1, -2, 0, 0)
+	detailStrip.Position = UDim2.new(0, 1, 1, 0)
+	detailStrip.AnchorPoint = Vector2.new(0, 1)
+	detailStrip.BackgroundColor3 = C.PanelTop; detailStrip.BorderSizePixel = 0
+	detailStrip.ClipsDescendants = true; detailStrip.ZIndex = 5
+	detailStrip.Parent = main
+	Instance.new("UICorner", detailStrip).CornerRadius = UDim.new(0, 8)
 
-	local dLayout = Instance.new("UIListLayout", detailPanel); dLayout.SortOrder = Enum.SortOrder.LayoutOrder; dLayout.Padding = UDim.new(0, 3)
-	local dPad = Instance.new("UIPadding", detailPanel)
-	dPad.PaddingTop = UDim.new(0, 8); dPad.PaddingBottom = UDim.new(0, 8); dPad.PaddingLeft = UDim.new(0, 8); dPad.PaddingRight = UDim.new(0, 8)
-	updateDetailPanel()
+	-- Open animation (fade in)
+	main.GroupTransparency = 1
+	TweenService:Create(main, tweenOpen, {GroupTransparency = 0}):Play()
 end
 
 function closeBuildMenu()
-	-- SOUND: menu close
 	playUISound(SOUNDS.MenuClose, 0.5)
-
 	cleanupViewportConnections()
-	if menuGui then menuGui:Destroy(); menuGui = nil end
-	menuOpen = false; gridContainer = nil; detailPanel = nil; categoryButtons = {}; searchText = ""
+
+	if menuGui then
+		local main = menuGui:FindFirstChild("Main")
+		if main and main:IsA("CanvasGroup") then
+			local t = TweenService:Create(main, tweenClose, {GroupTransparency = 1})
+			t:Play()
+			t.Completed:Connect(function()
+				if menuGui then menuGui:Destroy(); menuGui = nil end
+			end)
+		else
+			menuGui:Destroy(); menuGui = nil
+		end
+	end
+
+	menuOpen = false; gridContainer = nil; detailStrip = nil; categoryButtons = {}; searchText = ""
 end
 
 -- =============================================
--- TOOLBAR (parchment)
+-- TOOLBAR (dark teal, placement controls)
 -- =============================================
 local toolbarGui, rotationBtn, gridBtn, gridSizeLabel = nil, nil, nil, nil
 
 local function updateToolbarUI()
 	if rotationBtn then
-		if freeformMode then rotationBtn.Text = "[T] Free"; rotationBtn.BackgroundColor3 = Color3.fromRGB(130,175,120)
-		else rotationBtn.Text = "[T] 15° Snap"; rotationBtn.BackgroundColor3 = Color3.fromRGB(180,170,150) end
+		if freeformMode then
+			rotationBtn.Text = "[T] Free"; rotationBtn.BackgroundColor3 = C.Green; rotationBtn.TextColor3 = Color3.new(1,1,1)
+		else
+			rotationBtn.Text = "[T] 15° Snap"; rotationBtn.BackgroundColor3 = C.SlotTop; rotationBtn.TextColor3 = C.GoldTxt
+		end
 	end
 	if gridBtn then
-		if gridEnabled then gridBtn.Text = "[G] Grid ON"; gridBtn.BackgroundColor3 = Color3.fromRGB(130,175,120)
-		else gridBtn.Text = "[G] Grid OFF"; gridBtn.BackgroundColor3 = Color3.fromRGB(180,170,150) end
+		if gridEnabled then
+			gridBtn.Text = "[G] Grid ON"; gridBtn.BackgroundColor3 = C.Green; gridBtn.TextColor3 = Color3.new(1,1,1)
+		else
+			gridBtn.Text = "[G] Grid OFF"; gridBtn.BackgroundColor3 = C.SlotTop; gridBtn.TextColor3 = C.GoldTxt
+		end
 	end
 	if gridSizeLabel then gridSizeLabel.Text = GRID_SIZE .. " st" end
 end
@@ -671,76 +735,118 @@ end
 local function showToolbar()
 	if toolbarGui then return end
 	toolbarGui = Instance.new("ScreenGui"); toolbarGui.Name = "BuildToolbar"; toolbarGui.ResetOnSpawn = false; toolbarGui.Parent = playerGui
-	local panel = Instance.new("Frame"); panel.Size = UDim2.new(0,160,0,220)
-	panel.Position = UDim2.new(1,-170,0.5,-110); panel.BackgroundTransparency = 1; panel.BorderSizePixel = 0; panel.Parent = toolbarGui
-	local bg = Instance.new("ImageLabel"); bg.Size = UDim2.new(1,0,1,0); bg.BackgroundTransparency = 1
-	bg.Image = UI.ToolbarPanel; bg.ScaleType = Enum.ScaleType.Stretch; bg.ZIndex = 0; bg.Parent = panel
-	local pad = Instance.new("UIPadding", panel); pad.PaddingTop = UDim.new(0,12); pad.PaddingBottom = UDim.new(0,12)
-	pad.PaddingLeft = UDim.new(0,12); pad.PaddingRight = UDim.new(0,12)
-	local lay = Instance.new("UIListLayout", panel); lay.SortOrder = Enum.SortOrder.LayoutOrder; lay.Padding = UDim.new(0,5)
 
-	local ti = Instance.new("TextLabel"); ti.Size = UDim2.new(1,0,0,16); ti.BackgroundTransparency = 1
-	ti.Text = "TOOLS"; ti.TextColor3 = THEME.TextDark; ti.TextSize = 12; ti.Font = Enum.Font.GothamBold; ti.LayoutOrder = 0; ti.Parent = panel
+	local panel = Instance.new("CanvasGroup")
+	panel.Size = UDim2.new(0, 150, 0, 210); panel.Position = UDim2.new(1, -160, 0.5, -105)
+	panel.BackgroundColor3 = C.Panel; panel.BorderSizePixel = 0; panel.Parent = toolbarGui
+	Instance.new("UICorner", panel).CornerRadius = UDim.new(0, 10)
+	local tbStroke = Instance.new("UIStroke"); tbStroke.Color = C.GoldDim; tbStroke.Thickness = 1; tbStroke.Parent = panel
 
-	rotationBtn = Instance.new("TextButton"); rotationBtn.Size = UDim2.new(1,0,0,26)
-	rotationBtn.TextColor3 = THEME.TextDark; rotationBtn.TextSize = 10; rotationBtn.Font = Enum.Font.GothamBold
-	rotationBtn.LayoutOrder = 1; rotationBtn.Parent = panel; Instance.new("UICorner", rotationBtn).CornerRadius = UDim.new(0,4)
+	local pad = Instance.new("UIPadding", panel)
+	pad.PaddingTop = UDim.new(0, 10); pad.PaddingBottom = UDim.new(0, 10)
+	pad.PaddingLeft = UDim.new(0, 10); pad.PaddingRight = UDim.new(0, 10)
+	local lay = Instance.new("UIListLayout", panel); lay.SortOrder = Enum.SortOrder.LayoutOrder; lay.Padding = UDim.new(0, 5)
+
+	local ti = Instance.new("TextLabel"); ti.Size = UDim2.new(1, 0, 0, 16); ti.BackgroundTransparency = 1
+	ti.Text = "TOOLS"; ti.TextColor3 = C.GoldTxt; ti.TextSize = 12; ti.Font = Enum.Font.GothamBold
+	ti.LayoutOrder = 0; ti.Parent = panel
+
+	rotationBtn = Instance.new("TextButton"); rotationBtn.Size = UDim2.new(1, 0, 0, 26); rotationBtn.BorderSizePixel = 0
+	rotationBtn.TextSize = 10; rotationBtn.Font = Enum.Font.GothamBold; rotationBtn.LayoutOrder = 1; rotationBtn.Parent = panel
+	Instance.new("UICorner", rotationBtn).CornerRadius = UDim.new(0, 4)
 	rotationBtn.MouseButton1Click:Connect(function() freeformMode = not freeformMode; updateToolbarUI() end)
 
-	local rb = Instance.new("TextButton"); rb.Size = UDim2.new(1,0,0,20); rb.BackgroundColor3 = Color3.fromRGB(195,140,130)
-	rb.TextColor3 = THEME.TextDark; rb.TextSize = 9; rb.Font = Enum.Font.GothamBold; rb.Text = "[V] Reset"
-	rb.LayoutOrder = 2; rb.Parent = panel; Instance.new("UICorner", rb).CornerRadius = UDim.new(0,4)
+	local rb = Instance.new("TextButton"); rb.Size = UDim2.new(1, 0, 0, 20)
+	rb.BackgroundColor3 = C.Danger; rb.BorderSizePixel = 0
+	rb.TextColor3 = Color3.new(1, 1, 1); rb.TextSize = 9; rb.Font = Enum.Font.GothamBold; rb.Text = "[V] Reset"
+	rb.LayoutOrder = 2; rb.Parent = panel
+	Instance.new("UICorner", rb).CornerRadius = UDim.new(0, 4)
 	rb.MouseButton1Click:Connect(function() currentRotation = 0 end)
 
-	local s1 = Instance.new("Frame"); s1.Size = UDim2.new(1,0,0,1); s1.BackgroundColor3 = THEME.GoldDim
+	local s1 = Instance.new("Frame"); s1.Size = UDim2.new(1, 0, 0, 1); s1.BackgroundColor3 = C.GoldDim
 	s1.BackgroundTransparency = 0.5; s1.BorderSizePixel = 0; s1.LayoutOrder = 3; s1.Parent = panel
 
-	gridBtn = Instance.new("TextButton"); gridBtn.Size = UDim2.new(1,0,0,26)
-	gridBtn.TextColor3 = THEME.TextDark; gridBtn.TextSize = 10; gridBtn.Font = Enum.Font.GothamBold
-	gridBtn.LayoutOrder = 4; gridBtn.Parent = panel; Instance.new("UICorner", gridBtn).CornerRadius = UDim.new(0,4)
-	gridBtn.MouseButton1Click:Connect(function() gridEnabled = not gridEnabled; if gridEnabled then showGrid() else hideGrid() end; updateToolbarUI() end)
+	gridBtn = Instance.new("TextButton"); gridBtn.Size = UDim2.new(1, 0, 0, 26); gridBtn.BorderSizePixel = 0
+	gridBtn.TextSize = 10; gridBtn.Font = Enum.Font.GothamBold; gridBtn.LayoutOrder = 4; gridBtn.Parent = panel
+	Instance.new("UICorner", gridBtn).CornerRadius = UDim.new(0, 4)
+	gridBtn.MouseButton1Click:Connect(function()
+		gridEnabled = not gridEnabled; if gridEnabled then showGrid() else hideGrid() end; updateToolbarUI()
+	end)
 
-	local sr = Instance.new("Frame"); sr.Size = UDim2.new(1,0,0,26); sr.BackgroundTransparency = 1; sr.LayoutOrder = 5; sr.Parent = panel
-	local mb = Instance.new("TextButton"); mb.Size = UDim2.new(0,26,1,0); mb.BackgroundColor3 = Color3.fromRGB(180,170,150)
-	mb.TextColor3 = THEME.TextDark; mb.TextSize = 14; mb.Font = Enum.Font.GothamBold; mb.Text = "-"; mb.Parent = sr
-	Instance.new("UICorner", mb).CornerRadius = UDim.new(0,4)
-	gridSizeLabel = Instance.new("TextLabel"); gridSizeLabel.Size = UDim2.new(1,-60,1,0); gridSizeLabel.Position = UDim2.new(0,30,0,0)
-	gridSizeLabel.BackgroundTransparency = 1; gridSizeLabel.TextColor3 = THEME.TextDark; gridSizeLabel.TextSize = 10
-	gridSizeLabel.Font = Enum.Font.GothamBold; gridSizeLabel.Parent = sr
-	local pBtn = Instance.new("TextButton"); pBtn.Size = UDim2.new(0,26,1,0); pBtn.Position = UDim2.new(1,-26,0,0)
-	pBtn.BackgroundColor3 = Color3.fromRGB(180,170,150); pBtn.TextColor3 = THEME.TextDark; pBtn.TextSize = 14
-	pBtn.Font = Enum.Font.GothamBold; pBtn.Text = "+"; pBtn.Parent = sr; Instance.new("UICorner", pBtn).CornerRadius = UDim.new(0,4)
+	local sr = Instance.new("Frame"); sr.Size = UDim2.new(1, 0, 0, 26); sr.BackgroundTransparency = 1; sr.LayoutOrder = 5; sr.Parent = panel
+
+	local mb = Instance.new("TextButton"); mb.Size = UDim2.new(0, 26, 1, 0)
+	mb.BackgroundColor3 = C.SlotTop; mb.BorderSizePixel = 0; mb.TextColor3 = C.GoldTxt
+	mb.TextSize = 14; mb.Font = Enum.Font.GothamBold; mb.Text = "-"; mb.Parent = sr
+	Instance.new("UICorner", mb).CornerRadius = UDim.new(0, 4)
+
+	gridSizeLabel = Instance.new("TextLabel")
+	gridSizeLabel.Size = UDim2.new(1, -60, 1, 0); gridSizeLabel.Position = UDim2.new(0, 30, 0, 0)
+	gridSizeLabel.BackgroundTransparency = 1; gridSizeLabel.TextColor3 = C.GoldTxt
+	gridSizeLabel.TextSize = 10; gridSizeLabel.Font = Enum.Font.GothamBold; gridSizeLabel.Parent = sr
+
+	local pBtn = Instance.new("TextButton"); pBtn.Size = UDim2.new(0, 26, 1, 0); pBtn.Position = UDim2.new(1, -26, 0, 0)
+	pBtn.BackgroundColor3 = C.SlotTop; pBtn.BorderSizePixel = 0; pBtn.TextColor3 = C.GoldTxt
+	pBtn.TextSize = 14; pBtn.Font = Enum.Font.GothamBold; pBtn.Text = "+"; pBtn.Parent = sr
+	Instance.new("UICorner", pBtn).CornerRadius = UDim.new(0, 4)
+
 	mb.MouseButton1Click:Connect(function() if gridSizeIndex > 1 then gridSizeIndex -= 1; GRID_SIZE = GRID_SIZES[gridSizeIndex]; refreshGrid(); updateToolbarUI() end end)
 	pBtn.MouseButton1Click:Connect(function() if gridSizeIndex < #GRID_SIZES then gridSizeIndex += 1; GRID_SIZE = GRID_SIZES[gridSizeIndex]; refreshGrid(); updateToolbarUI() end end)
 
-	local ht = Instance.new("TextLabel"); ht.Size = UDim2.new(1,0,0,40); ht.BackgroundTransparency = 1
-	ht.Text = "R = Rotate | V = Reset\nT = Mode | G = Grid"; ht.TextColor3 = THEME.TextLight
+	local ht = Instance.new("TextLabel"); ht.Size = UDim2.new(1, 0, 0, 36); ht.BackgroundTransparency = 1
+	ht.Text = "R = Rotate | V = Reset\nT = Mode | G = Grid"; ht.TextColor3 = C.Key
 	ht.TextSize = 9; ht.Font = Enum.Font.Gotham; ht.TextYAlignment = Enum.TextYAlignment.Top
 	ht.LayoutOrder = 7; ht.Parent = panel
 	updateToolbarUI()
+
+	-- Fade in
+	panel.GroupTransparency = 1
+	TweenService:Create(panel, tweenOpen, {GroupTransparency = 0}):Play()
 end
 
-local function hideToolbar() if toolbarGui then toolbarGui:Destroy(); toolbarGui = nil; rotationBtn = nil; gridBtn = nil; gridSizeLabel = nil end end
+local function hideToolbar()
+	if toolbarGui then toolbarGui:Destroy(); toolbarGui = nil; rotationBtn = nil; gridBtn = nil; gridSizeLabel = nil end
+end
 
--- Placement HUD
+-- =============================================
+-- PLACEMENT HUD (bottom bar)
+-- =============================================
 local placementGui = nil
+
 function showPlacementHUD()
 	if placementGui then placementGui:Destroy() end
 	placementGui = Instance.new("ScreenGui"); placementGui.Name = "PlacementHUD"; placementGui.ResetOnSpawn = false; placementGui.Parent = playerGui
-	local f = Instance.new("ImageLabel"); f.Size = UDim2.new(0,380,0,48); f.Position = UDim2.new(0.5,-190,1,-75)
-	f.BackgroundTransparency = 1; f.Image = UI.Tooltip; f.ScaleType = Enum.ScaleType.Stretch; f.Parent = placementGui
+
+	local f = Instance.new("CanvasGroup")
+	f.Size = UDim2.new(0, 380, 0, 48); f.Position = UDim2.new(0.5, -190, 1, -75)
+	f.BackgroundColor3 = C.Panel; f.BorderSizePixel = 0; f.Parent = placementGui
+	Instance.new("UICorner", f).CornerRadius = UDim.new(0, 8)
+	local hudStroke = Instance.new("UIStroke"); hudStroke.Color = C.GoldDim; hudStroke.Thickness = 1; hudStroke.Parent = f
+
 	local config = BuildingConfig.GetBuilding(currentBuildingName)
 	local dn = config and config.DisplayName or currentBuildingName
-	local nl = Instance.new("TextLabel"); nl.Size = UDim2.new(1,0,0,18); nl.Position = UDim2.new(0,0,0,5)
-	nl.BackgroundTransparency = 1; nl.Text = dn.."  ("..BuildingConfig.GetCostString(currentBuildingName)..")"
-	nl.TextColor3 = THEME.TextDark; nl.TextSize = 12; nl.Font = Enum.Font.GothamBold; nl.Parent = f
-	local cl = Instance.new("TextLabel"); cl.Size = UDim2.new(1,0,0,14); cl.Position = UDim2.new(0,0,0,24)
+
+	local nl = Instance.new("TextLabel")
+	nl.Size = UDim2.new(1, 0, 0, 18); nl.Position = UDim2.new(0, 0, 0, 5)
+	nl.BackgroundTransparency = 1
+	nl.Text = dn .. "  (" .. BuildingConfig.GetCostString(currentBuildingName) .. ")"
+	nl.TextColor3 = C.GoldTxt; nl.TextSize = 12; nl.Font = Enum.Font.GothamBold; nl.Parent = f
+
+	local cl = Instance.new("TextLabel")
+	cl.Size = UDim2.new(1, 0, 0, 14); cl.Position = UDim2.new(0, 0, 0, 24)
 	cl.BackgroundTransparency = 1; cl.Text = "[Click] Place  [R] Rotate  [V] Reset  [X] Cancel"
-	cl.TextColor3 = THEME.TextMedium; cl.TextSize = 10; cl.Font = Enum.Font.Gotham; cl.Parent = f
+	cl.TextColor3 = C.Label; cl.TextSize = 10; cl.Font = Enum.Font.Gotham; cl.Parent = f
+
+	-- Fade in
+	f.GroupTransparency = 1
+	TweenService:Create(f, tweenOpen, {GroupTransparency = 0}):Play()
 end
+
 function hidePlacementHUD() if placementGui then placementGui:Destroy(); placementGui = nil end end
 
--- Placement flow
+-- =============================================
+-- PLACEMENT FLOW
+-- =============================================
 function startPlacement(bn)
 	if isPlacing then cancelPlacement() end
 	local config = BuildingConfig.GetBuilding(bn); if not config then return end
@@ -748,6 +854,7 @@ function startPlacement(bn)
 	currentBuildingName = bn; currentRotation = 0; isPlacing = true; canPlace = false; holdingR = false
 	createGhost(bn); showPlacementHUD(); showToolbar(); if gridEnabled then showGrid() end
 end
+
 local function confirmPlacement()
 	if not isPlacing or not canPlace then return end
 	local hp = getMouseTerrainPosition(); if not hp then return end; hp = snapToGrid(hp)
@@ -755,13 +862,22 @@ local function confirmPlacement()
 	destroyGhost(); hideGrid(); hideToolbar(); hidePlacementHUD()
 	isPlacing = false; canPlace = false; currentBuildingName = nil
 end
-function cancelPlacement() destroyGhost(); hideGrid(); hideToolbar(); hidePlacementHUD(); isPlacing = false; canPlace = false; currentBuildingName = nil end
 
--- Input
+function cancelPlacement()
+	destroyGhost(); hideGrid(); hideToolbar(); hidePlacementHUD()
+	isPlacing = false; canPlace = false; currentBuildingName = nil
+end
+
+-- =============================================
+-- INPUT
+-- =============================================
 UserInputService.InputBegan:Connect(function(input, gp)
 	if gp then return end
 	if isPlacing then
-		if input.KeyCode == Enum.KeyCode.R then if freeformMode then holdingR = true else currentRotation += SNAP_STEP; if currentRotation >= math.pi*2 then currentRotation = 0 end end end
+		if input.KeyCode == Enum.KeyCode.R then
+			if freeformMode then holdingR = true
+			else currentRotation += SNAP_STEP; if currentRotation >= math.pi*2 then currentRotation = 0 end end
+		end
 		if input.KeyCode == Enum.KeyCode.V then currentRotation = 0 end
 		if input.KeyCode == Enum.KeyCode.T then freeformMode = not freeformMode; updateToolbarUI() end
 		if input.KeyCode == Enum.KeyCode.G then gridEnabled = not gridEnabled; if gridEnabled then showGrid() else hideGrid() end; updateToolbarUI() end
@@ -773,7 +889,9 @@ UserInputService.InputBegan:Connect(function(input, gp)
 end)
 UserInputService.InputEnded:Connect(function(input) if input.KeyCode == Enum.KeyCode.R then holdingR = false end end)
 
--- Render
+-- =============================================
+-- RENDER
+-- =============================================
 local gridUpdateTimer = 0
 RunService.RenderStepped:Connect(function(dt)
 	if isPlacing then
@@ -783,7 +901,9 @@ RunService.RenderStepped:Connect(function(dt)
 	end
 end)
 
+-- =============================================
 -- API
+-- =============================================
 local api = Instance.new("BindableEvent"); api.Name = "BuildingPlacementAPI"; api.Parent = player
 api.Event:Connect(function(a,...) if a == "StartPlacement" then startPlacement(...) elseif a == "CancelPlacement" then cancelPlacement() end end)
 
