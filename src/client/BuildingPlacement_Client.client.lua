@@ -338,13 +338,13 @@ local function updateDetailStrip()
 		TweenService:Create(gridContainer, tweenSlide, {Size = UDim2.new(1, -(SIDEBAR_W + 16 + 8), 1, -52 - STRIP_H - 4)}):Play()
 	end
 
-	-- Divider at top
+	-- Gold divider line at top
 	local div = Instance.new("Frame")
 	div.Name = "StripDivider"
-	div.Size = UDim2.new(1, -16, 0, 1)
-	div.Position = UDim2.new(0, 8, 0, 1)
-	div.BackgroundColor3 = C.GoldDim
-	div.BackgroundTransparency = 0.4
+	div.Size = UDim2.new(1, 0, 0, 2)
+	div.Position = UDim2.new(0, 0, 0, 0)
+	div.BackgroundColor3 = C.Gold
+	div.BackgroundTransparency = 0.2
 	div.BorderSizePixel = 0
 	div.Parent = detailStrip
 
@@ -679,7 +679,7 @@ local function openBuildMenu()
 	detailStrip.Size = UDim2.new(1, -2, 0, 0)
 	detailStrip.Position = UDim2.new(0, 1, 1, 0)
 	detailStrip.AnchorPoint = Vector2.new(0, 1)
-	detailStrip.BackgroundColor3 = C.PanelTop; detailStrip.BorderSizePixel = 0
+	detailStrip.BackgroundColor3 = C.SlotTop; detailStrip.BorderSizePixel = 0
 	detailStrip.ClipsDescendants = true; detailStrip.ZIndex = 5
 	detailStrip.Parent = main
 	Instance.new("UICorner", detailStrip).CornerRadius = UDim.new(0, 8)
