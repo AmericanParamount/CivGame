@@ -1,0 +1,704 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Build Menu — Mockup v1</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Noto+Sans:wght@400;500;600;700&display=swap');
+
+  :root {
+    /* ── Palette (unified with HUD mockup) ── */
+    --panel:        #0f1e1e;
+    --panel-top:    #122424;
+    --panel-bot:    #0c1818;
+    --slot:         #162828;
+    --slot-hover:   #1c3030;
+    --slot-selected:#1e3434;
+    --gold:         #b8943e;
+    --gold-dim:     #6b5a2a;
+    --gold-txt:     #d4b86a;
+    --gold-warm:    #d4aa4a;
+    --gold-bright:  #e8c452;
+    --label:        #8a9a8a;
+    --key:          #5a6a5a;
+    --danger:       #a04028;
+    --caution:      #c47a2a;
+    --green:        #469641;
+    --icon-bg:      #0e1c1c;
+    --text-body:    #d4c9a8;
+
+    /* ── Sizing ── */
+    --sidebar-w:    90px;
+    --tile-size:    110px;
+    --strip-h:      88px;
+    --corner-r:     10px;
+    --gap:          6px;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Noto Sans', sans-serif;
+    background: #1a2a2a;
+    color: var(--text-body);
+    height: 100vh;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background:
+      radial-gradient(ellipse at 50% 40%, #2a3d3d 0%, #0f1a1a 70%),
+      linear-gradient(180deg, #1a2e2e 0%, #0d1717 100%);
+    z-index: 0;
+  }
+
+  /* ════════════════════════════════════════
+     MAIN PANEL
+     ════════════════════════════════════════ */
+  .build-panel {
+    position: relative;
+    z-index: 10;
+    width: clamp(520px, 55vw, 800px);
+    height: clamp(380px, 60vh, 540px);
+    background: linear-gradient(170deg, var(--panel-top) 0%, var(--panel) 40%, var(--panel-bot) 100%);
+    border: 2px solid var(--gold-dim);
+    border-radius: var(--corner-r);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    box-shadow:
+      0 8px 40px rgba(0,0,0,0.6),
+      inset 0 1px 0 rgba(184,148,62,0.12);
+    animation: panelOpen 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  }
+
+  @keyframes panelOpen {
+    from { opacity: 0; transform: scale(0.95); }
+    to   { opacity: 1; transform: scale(1); }
+  }
+
+  /* Gold highlight line at top */
+  .build-panel::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 12px; right: 12px;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, var(--gold), transparent);
+    opacity: 0.5;
+    z-index: 1;
+  }
+
+  /* ── Top Bar ── */
+  .top-bar {
+    display: flex;
+    align-items: center;
+    padding: 10px 14px 8px;
+    gap: 12px;
+    flex-shrink: 0;
+    cursor: move;
+  }
+
+  .top-bar h1 {
+    font-family: 'Cinzel', serif;
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--gold-txt);
+    letter-spacing: 2px;
+    flex-shrink: 0;
+  }
+
+  .drag-hint {
+    font-size: 8px;
+    color: var(--key);
+    letter-spacing: 1px;
+    margin-left: -6px;
+    margin-top: 2px;
+    flex-shrink: 0;
+  }
+
+  .search-box {
+    flex: 0 1 200px;
+    margin-left: auto;
+    position: relative;
+  }
+
+  .search-box input {
+    width: 100%;
+    padding: 5px 10px 5px 28px;
+    background: var(--icon-bg);
+    border: 1px solid var(--gold-dim);
+    border-radius: 6px;
+    color: var(--gold-txt);
+    font-size: 11px;
+    font-family: 'Noto Sans', sans-serif;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+
+  .search-box input:focus { border-color: var(--gold); }
+
+  .search-box input::placeholder { color: var(--key); }
+
+  .search-box::before {
+    content: '';
+    position: absolute;
+    left: 9px; top: 50%;
+    width: 12px; height: 12px;
+    border: 1.5px solid var(--key);
+    border-radius: 50%;
+    transform: translateY(-50%);
+  }
+  .search-box::after {
+    content: '';
+    position: absolute;
+    left: 19px; top: calc(50% + 5px);
+    width: 5px; height: 1.5px;
+    background: var(--key);
+    transform: rotate(45deg);
+  }
+
+  .close-btn {
+    width: 28px; height: 28px;
+    background: var(--danger);
+    border: none; border-radius: 6px;
+    color: white; font-weight: 700;
+    font-size: 13px; cursor: pointer;
+    transition: background 0.15s;
+    flex-shrink: 0;
+  }
+  .close-btn:hover { background: #c04832; }
+
+  /* ── Meander divider ── */
+  .meander {
+    height: 2px;
+    margin: 0 12px;
+    background: repeating-linear-gradient(
+      90deg,
+      var(--gold) 0px, var(--gold) 6px,
+      transparent 6px, transparent 9px,
+      var(--gold) 9px, var(--gold) 10px,
+      transparent 10px, transparent 13px
+    );
+    opacity: 0.25;
+    flex-shrink: 0;
+  }
+
+  /* ── Content Area ── */
+  .content-area {
+    display: flex;
+    flex: 1;
+    min-height: 0;
+    position: relative;
+  }
+
+  /* ── Sidebar ── */
+  .sidebar {
+    width: var(--sidebar-w);
+    flex-shrink: 0;
+    padding: 8px 6px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    overflow-y: auto;
+    scrollbar-width: none;
+  }
+  .sidebar::-webkit-scrollbar { display: none; }
+
+  .cat-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 8px;
+    border: none;
+    border-radius: 4px;
+    background: transparent;
+    color: var(--label);
+    font-size: 11px;
+    font-weight: 600;
+    font-family: 'Noto Sans', sans-serif;
+    cursor: pointer;
+    transition: all 0.15s;
+    text-align: left;
+    white-space: nowrap;
+  }
+
+  .cat-btn:hover { background: rgba(184,148,62,0.08); color: var(--gold-txt); }
+
+  .cat-btn.active {
+    background: var(--slot);
+    color: var(--gold-txt);
+    box-shadow: inset 2px 0 0 var(--gold);
+  }
+
+  .cat-icon {
+    width: 16px; height: 16px;
+    opacity: 0.6;
+  }
+  .cat-btn.active .cat-icon { opacity: 1; }
+
+  /* ── Sidebar / Grid divider ── */
+  .v-divider {
+    width: 1px;
+    background: linear-gradient(180deg, transparent, var(--gold-dim), transparent);
+    flex-shrink: 0;
+  }
+
+  /* ── Grid Area ── */
+  .grid-area {
+    flex: 1;
+    overflow-y: auto;
+    padding: 8px;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(var(--tile-size), 1fr));
+    gap: var(--gap);
+    align-content: start;
+    scrollbar-width: thin;
+    scrollbar-color: var(--gold-dim) transparent;
+    transition: padding-bottom 0.25s ease;
+  }
+
+  .grid-area.has-selection {
+    padding-bottom: calc(var(--strip-h) + 8px);
+  }
+
+  /* ── Building Tile ── */
+  .tile {
+    aspect-ratio: 1;
+    background: linear-gradient(160deg, var(--slot) 0%, var(--panel) 100%);
+    border: 1px solid var(--gold-dim);
+    border-radius: 7px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    cursor: pointer;
+    position: relative;
+    transition: all 0.15s cubic-bezier(0.34, 1.2, 0.64, 1);
+    overflow: hidden;
+  }
+
+  .tile:hover {
+    background: linear-gradient(160deg, var(--slot-hover) 0%, var(--slot) 100%);
+    border-color: var(--gold);
+    transform: scale(1.03);
+    box-shadow: 0 4px 16px rgba(184,148,62,0.12);
+  }
+
+  .tile.selected {
+    border-color: var(--gold-warm);
+    border-width: 2px;
+    background: linear-gradient(160deg, var(--slot-selected) 0%, var(--slot) 100%);
+    box-shadow:
+      0 0 16px rgba(184,148,62,0.2),
+      inset 0 0 20px rgba(184,148,62,0.04);
+  }
+
+  .tile.locked {
+    opacity: 0.5;
+  }
+  .tile.locked:hover {
+    transform: none;
+    border-color: var(--gold-dim);
+    box-shadow: none;
+  }
+
+  /* Preview placeholder (would be ViewportFrame in Roblox) */
+  .tile-preview {
+    width: 65%;
+    aspect-ratio: 1;
+    background: var(--icon-bg);
+    border-radius: 5px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 28px;
+    color: var(--gold-dim);
+    position: relative;
+  }
+
+  .tile-name {
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--gold-txt);
+    text-align: center;
+    line-height: 1.2;
+    padding: 0 4px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+  }
+
+  .tile.locked .tile-name { color: var(--key); }
+
+  .lock-badge {
+    position: absolute;
+    top: 4px; right: 4px;
+    font-size: 11px;
+    opacity: 0.7;
+  }
+
+  /* ════════════════════════════════════════
+     DETAIL STRIP (bottom slide-up)
+     ════════════════════════════════════════ */
+  .detail-strip {
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    height: 0;
+    background: linear-gradient(180deg, var(--slot) 0%, var(--panel-top) 100%);
+    border-top: 2px solid var(--gold);
+    overflow: hidden;
+    transition: height 0.25s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    z-index: 20;
+    display: flex;
+    align-items: center;
+    padding: 0 14px;
+    gap: 14px;
+  }
+
+  .detail-strip.open {
+    height: var(--strip-h);
+  }
+
+  /* Preview in strip */
+  .strip-preview {
+    width: 64px; height: 64px;
+    flex-shrink: 0;
+    background: var(--icon-bg);
+    border: 1px solid var(--gold-dim);
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 30px;
+  }
+
+  /* Info section */
+  .strip-info {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .strip-name {
+    font-family: 'Cinzel', serif;
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--gold-txt);
+    letter-spacing: 0.5px;
+  }
+
+  .strip-desc {
+    font-size: 10px;
+    color: var(--label);
+    line-height: 1.3;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .strip-meta {
+    display: flex;
+    gap: 16px;
+    margin-top: 2px;
+  }
+
+  .strip-cost {
+    font-size: 10px;
+    color: var(--gold-dim);
+  }
+  .strip-cost span { color: var(--gold-txt); font-weight: 600; }
+
+  .strip-req {
+    font-size: 10px;
+  }
+  .strip-req.met { color: var(--green); }
+  .strip-req.unmet { color: var(--danger); }
+
+  /* Place button */
+  .place-btn {
+    flex-shrink: 0;
+    padding: 9px 20px;
+    background: linear-gradient(180deg, var(--gold) 0%, #9a7a30 100%);
+    border: 1px solid var(--gold-bright);
+    border-radius: 6px;
+    color: var(--panel);
+    font-family: 'Cinzel', serif;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    cursor: pointer;
+    transition: all 0.15s;
+    box-shadow: 0 2px 8px rgba(184,148,62,0.3);
+  }
+
+  .place-btn:hover {
+    background: linear-gradient(180deg, var(--gold-bright) 0%, var(--gold) 100%);
+    box-shadow: 0 4px 16px rgba(184,148,62,0.45);
+    transform: translateY(-1px);
+  }
+
+  .place-btn:active {
+    transform: translateY(0);
+    box-shadow: 0 1px 4px rgba(184,148,62,0.3);
+  }
+
+  .place-btn.locked {
+    background: var(--key);
+    border-color: var(--label);
+    color: var(--label);
+    cursor: not-allowed;
+    box-shadow: none;
+  }
+  .place-btn.locked:hover {
+    transform: none;
+    box-shadow: none;
+  }
+
+  /* ════════════════════════════════════════
+     HOTKEY HINTS
+     ════════════════════════════════════════ */
+  .hotkey-bar {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+    padding: 4px 0;
+    flex-shrink: 0;
+  }
+
+  .hotkey {
+    font-size: 9px;
+    color: var(--key);
+    letter-spacing: 0.5px;
+  }
+
+  .hotkey kbd {
+    display: inline-block;
+    padding: 1px 5px;
+    background: var(--slot);
+    border: 1px solid var(--gold-dim);
+    border-radius: 3px;
+    font-family: 'Noto Sans', sans-serif;
+    font-size: 9px;
+    color: var(--gold-txt);
+    margin: 0 1px;
+  }
+
+  /* ════════════════════════════════════════
+     SCROLLBAR STYLING
+     ════════════════════════════════════════ */
+  .grid-area::-webkit-scrollbar { width: 4px; }
+  .grid-area::-webkit-scrollbar-track { background: transparent; }
+  .grid-area::-webkit-scrollbar-thumb { background: var(--gold-dim); border-radius: 2px; }
+
+  /* ════════════════════════════════════════
+     CORNER ORNAMENTS
+     ════════════════════════════════════════ */
+  .build-panel::after {
+    content: '';
+    position: absolute;
+    bottom: 0; left: 12px; right: 12px;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(184,148,62,0.15), transparent);
+  }
+</style>
+</head>
+<body>
+
+<div class="build-panel">
+  <!-- Top Bar -->
+  <div class="top-bar">
+    <h1>BUILD</h1>
+    <span class="drag-hint">drag to move</span>
+    <div class="search-box">
+      <input type="text" placeholder="Search buildings..." id="searchInput">
+    </div>
+    <button class="close-btn" title="Close (B)">X</button>
+  </div>
+
+  <div class="meander"></div>
+
+  <!-- Content -->
+  <div class="content-area">
+    <!-- Sidebar -->
+    <div class="sidebar">
+      <button class="cat-btn active" data-cat="All">All</button>
+      <button class="cat-btn" data-cat="Structures">Structures</button>
+      <button class="cat-btn" data-cat="Defenses">Defenses</button>
+      <button class="cat-btn" data-cat="Crafting">Crafting</button>
+      <button class="cat-btn" data-cat="Farming">Farming</button>
+      <button class="cat-btn" data-cat="Decorations">Decorations</button>
+      <button class="cat-btn" data-cat="Misc">Misc.</button>
+    </div>
+
+    <div class="v-divider"></div>
+
+    <!-- Grid -->
+    <div class="grid-area" id="gridArea"></div>
+
+    <!-- Detail Strip -->
+    <div class="detail-strip" id="detailStrip">
+      <div class="strip-preview" id="stripPreview"></div>
+      <div class="strip-info">
+        <div class="strip-name" id="stripName"></div>
+        <div class="strip-desc" id="stripDesc"></div>
+        <div class="strip-meta">
+          <div class="strip-cost" id="stripCost"></div>
+          <div class="strip-req" id="stripReq"></div>
+        </div>
+      </div>
+      <button class="place-btn" id="placeBtn">PLACE</button>
+    </div>
+  </div>
+
+  <div class="hotkey-bar">
+    <span class="hotkey"><kbd>B</kbd> Menu</span>
+    <span class="hotkey"><kbd>R</kbd> Rotate</span>
+    <span class="hotkey"><kbd>T</kbd> Snap Mode</span>
+    <span class="hotkey"><kbd>G</kbd> Grid</span>
+  </div>
+</div>
+
+<script>
+// ── Building data (matches BuildingConfig.lua) ──
+const BUILDINGS = [
+  { id:"TownHall",     name:"Town Hall",     cat:"Structures",  icon:"\u{1F3DB}", desc:"The heart of your civilization. Required to found a settlement.", cost:{Log:5,Stone:5}, minAge:16, unique:true },
+  { id:"WoodenHut",    name:"Wooden Hut",    cat:"Structures",  icon:"\u{1F3E0}", desc:"A simple shelter. Provides housing for your people.", cost:{Log:3}, minAge:12 },
+  { id:"StoneHouse",   name:"Stone House",   cat:"Structures",  icon:"\u{1F3E1}", desc:"A sturdy dwelling made of stone.", cost:{Log:2,Stone:5}, minAge:16 },
+  { id:"Longhouse",    name:"Longhouse",     cat:"Structures",  icon:"\u{1F3DA}", desc:"A large communal hall for feasts and gatherings.", cost:{Log:8}, minAge:18 },
+  { id:"StorageHut",   name:"Storage Hut",   cat:"Structures",  icon:"\u{1F4E6}", desc:"Extra space to store resources.", cost:{Log:3,Stone:1}, minAge:12 },
+  { id:"WoodenWall",   name:"Wooden Wall",   cat:"Defenses",    icon:"\u{1FAB5}", desc:"A basic wooden palisade.", cost:{Log:2}, minAge:10 },
+  { id:"StoneWall",    name:"Stone Wall",    cat:"Defenses",    icon:"\u{1F9F1}", desc:"A reinforced stone wall.", cost:{Stone:3}, minAge:14 },
+  { id:"WoodenGate",   name:"Wooden Gate",   cat:"Defenses",    icon:"\u{1F6AA}", desc:"A gate that can be opened and closed.", cost:{Log:3,Stone:1}, minAge:14 },
+  { id:"WatchTower",   name:"Watch Tower",   cat:"Defenses",    icon:"\u{1F5FC}", desc:"A tall lookout tower.", cost:{Log:4,Stone:3}, minAge:16 },
+  { id:"Campfire",     name:"Campfire",      cat:"Crafting",    icon:"\u{1F525}", desc:"A simple fire pit. Cook food and stay warm.", cost:{Log:2}, minAge:0 },
+  { id:"Workbench",    name:"Workbench",     cat:"Crafting",    icon:"\u{1FA9A}", desc:"A crafting station for tools and basic items.", cost:{Log:2,Stone:1}, minAge:10 },
+  { id:"Forge",        name:"Forge",         cat:"Crafting",    icon:"\u2692\uFE0F",  desc:"Smelt ores and craft metal tools and weapons.", cost:{Log:3,Stone:5}, minAge:16 },
+  { id:"Kiln",         name:"Kiln",          cat:"Crafting",    icon:"\u{1F3FA}", desc:"Fire clay into bricks and pottery.", cost:{Stone:4,Log:1}, minAge:14 },
+  { id:"FarmPlot",     name:"Farm Plot",     cat:"Farming",     icon:"\u{1F33E}", desc:"Tilled land for growing crops.", cost:{Log:1}, minAge:8 },
+  { id:"Well",         name:"Well",          cat:"Farming",     icon:"\u{1F4A7}", desc:"A water source for your settlement.", cost:{Stone:3,Log:1}, minAge:12 },
+  { id:"Silo",         name:"Silo",          cat:"Farming",     icon:"\u{1F3ED}", desc:"Stores harvested crops.", cost:{Log:3,Stone:2}, minAge:14 },
+  { id:"WoodenSign",   name:"Wooden Sign",   cat:"Decorations", icon:"\u{1FAA7}", desc:"A signpost. Mark locations and leave messages.", cost:{Log:1}, minAge:0 },
+  { id:"WoodenFence",  name:"Wooden Fence",  cat:"Decorations", icon:"\u{1F3DF}", desc:"A short decorative fence.", cost:{Log:1}, minAge:0 },
+  { id:"Chest",        name:"Chest",         cat:"Decorations", icon:"\u{1F4E5}", desc:"Personal storage. Keep your valuables safe.", cost:{Log:1}, minAge:8 },
+  { id:"Torch",        name:"Torch",         cat:"Decorations", icon:"\u{1F525}", desc:"A standing torch. Lights up the area at night.", cost:{Log:1}, minAge:0 },
+  { id:"Dock",         name:"Dock",          cat:"Misc",        icon:"\u{26F5}",  desc:"A wooden platform over water.", cost:{Log:5}, minAge:16 },
+  { id:"Bridge",       name:"Bridge",        cat:"Misc",        icon:"\u{1F309}", desc:"A wooden crossing over water or gaps.", cost:{Log:4,Stone:2}, minAge:14 },
+];
+
+const PLAYER_AGE = 12; // simulate a 12-year-old character
+
+let currentCat = "All";
+let selectedId = null;
+let searchText = "";
+
+const grid = document.getElementById('gridArea');
+const strip = document.getElementById('detailStrip');
+
+function costStr(cost) {
+  return Object.entries(cost).map(([k,v]) => `<span>${v}x</span> ${k}`).join(', ');
+}
+
+function canBuild(b) { return PLAYER_AGE >= (b.minAge || 0); }
+
+function renderGrid() {
+  grid.innerHTML = '';
+  const filtered = BUILDINGS.filter(b => {
+    if (currentCat !== "All" && b.cat !== currentCat) return false;
+    if (searchText && !b.name.toLowerCase().includes(searchText.toLowerCase())) return false;
+    return true;
+  });
+
+  filtered.forEach(b => {
+    const can = canBuild(b);
+    const sel = b.id === selectedId;
+    const tile = document.createElement('div');
+    tile.className = 'tile' + (sel ? ' selected' : '') + (!can ? ' locked' : '');
+    tile.innerHTML = `
+      <div class="tile-preview">${b.icon}</div>
+      <div class="tile-name">${b.name}</div>
+      ${!can ? '<div class="lock-badge">\u{1F512}</div>' : ''}
+    `;
+    tile.addEventListener('click', () => selectBuilding(b.id));
+    grid.appendChild(tile);
+  });
+}
+
+function selectBuilding(id) {
+  if (selectedId === id) { selectedId = null; } else { selectedId = id; }
+  renderGrid();
+  updateStrip();
+}
+
+function updateStrip() {
+  if (!selectedId) {
+    strip.classList.remove('open');
+    grid.classList.remove('has-selection');
+    return;
+  }
+
+  const b = BUILDINGS.find(x => x.id === selectedId);
+  if (!b) return;
+
+  const can = canBuild(b);
+
+  document.getElementById('stripPreview').textContent = b.icon;
+  document.getElementById('stripName').textContent = b.name;
+  document.getElementById('stripDesc').textContent = b.desc;
+  document.getElementById('stripCost').innerHTML = 'Cost: ' + costStr(b.cost);
+
+  const req = document.getElementById('stripReq');
+  if (b.minAge > 0) {
+    req.textContent = `Requires: Age ${b.minAge}+`;
+    req.className = 'strip-req ' + (can ? 'met' : 'unmet');
+  } else {
+    req.textContent = 'Requires: None';
+    req.className = 'strip-req met';
+  }
+
+  const btn = document.getElementById('placeBtn');
+  btn.textContent = can ? 'PLACE' : 'LOCKED';
+  btn.className = 'place-btn' + (can ? '' : ' locked');
+
+  strip.classList.add('open');
+  grid.classList.add('has-selection');
+}
+
+// Category buttons
+document.querySelectorAll('.cat-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.cat-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    currentCat = btn.dataset.cat;
+    selectedId = null;
+    renderGrid();
+    updateStrip();
+  });
+});
+
+// Search
+document.getElementById('searchInput').addEventListener('input', e => {
+  searchText = e.target.value;
+  renderGrid();
+});
+
+// Keyboard: B to close, Escape to deselect
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') { selectedId = null; renderGrid(); updateStrip(); }
+});
+
+// Initial render
+renderGrid();
+</script>
+</body>
+</html>
