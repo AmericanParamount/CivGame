@@ -325,7 +325,7 @@ local function updateDetailStrip()
 	if not selectedBuilding then
 		TweenService:Create(detailStrip, tweenSlide, {Size = UDim2.new(1, -2, 0, 0)}):Play()
 		if gridContainer then
-			TweenService:Create(gridContainer, tweenSlide, {Size = UDim2.new(1, -(SIDEBAR_W + 16 + 8), 1, -52)}):Play()
+			TweenService:Create(gridContainer, tweenSlide, {Size = UDim2.new(1, -(SIDEBAR_W + 16 + 8), 1, -68)}):Play()
 		end
 		return
 	end
@@ -335,7 +335,7 @@ local function updateDetailStrip()
 
 	TweenService:Create(detailStrip, tweenSlide, {Size = UDim2.new(1, -2, 0, STRIP_H)}):Play()
 	if gridContainer then
-		TweenService:Create(gridContainer, tweenSlide, {Size = UDim2.new(1, -(SIDEBAR_W + 16 + 8), 1, -52 - STRIP_H - 4)}):Play()
+		TweenService:Create(gridContainer, tweenSlide, {Size = UDim2.new(1, -(SIDEBAR_W + 16 + 8), 1, -68 - STRIP_H - 4)}):Play()
 	end
 
 	-- Gold divider line at top
@@ -403,18 +403,29 @@ local function updateDetailStrip()
 	reqLabel.TextXAlignment = Enum.TextXAlignment.Left
 	reqLabel.Parent = detailStrip
 
-	-- Place button (right)
+	-- Place button (right) with gold gradient
 	local placeBtn = Instance.new("TextButton")
-	placeBtn.Size = UDim2.new(0, 110, 0, 36)
-	placeBtn.Position = UDim2.new(1, -120, 0.5, -18)
+	placeBtn.Size = UDim2.new(0, 116, 0, 36)
+	placeBtn.Position = UDim2.new(1, -124, 0.5, -18)
 	placeBtn.BackgroundColor3 = cb and C.Gold or C.Key
 	placeBtn.BorderSizePixel = 0
 	placeBtn.TextColor3 = cb and C.Panel or C.Label
-	placeBtn.TextSize = 13; placeBtn.Font = Enum.Font.GothamBold
-	placeBtn.Text = cb and "Place Blueprint" or "Locked"
+	placeBtn.TextSize = 12; placeBtn.Font = Enum.Font.GothamBold
+	placeBtn.Text = cb and "PLACE" or "LOCKED"
 	placeBtn.AutoButtonColor = cb
 	placeBtn.Parent = detailStrip
 	Instance.new("UICorner", placeBtn).CornerRadius = UDim.new(0, 6)
+	if cb then
+		local btnGrad = Instance.new("UIGradient")
+		btnGrad.Color = ColorSequence.new({
+			ColorSequenceKeypoint.new(0, Color3.fromRGB(212, 170, 74)),
+			ColorSequenceKeypoint.new(1, Color3.fromRGB(154, 122, 48)),
+		})
+		btnGrad.Rotation = 90
+		btnGrad.Parent = placeBtn
+		local btnStroke = Instance.new("UIStroke")
+		btnStroke.Color = C.GoldBright; btnStroke.Thickness = 1; btnStroke.Parent = placeBtn
+	end
 
 	if cb then
 		placeBtn.MouseButton1Click:Connect(function()
@@ -470,6 +481,18 @@ local function populateGrid()
 
 		if not cb then tile.BackgroundTransparency = 0.3 end
 
+		-- Selected inner glow
+		if name == selectedBuilding then
+			local glow = Instance.new("Frame")
+			glow.Size = UDim2.new(1, 0, 1, 0)
+			glow.BackgroundColor3 = C.Gold
+			glow.BackgroundTransparency = 0.92
+			glow.BorderSizePixel = 0
+			glow.ZIndex = 1
+			glow.Parent = tile
+			Instance.new("UICorner", glow).CornerRadius = UDim.new(0, 6)
+		end
+
 		-- 3D preview (static angle)
 		createViewportPreview(tile, name)
 
@@ -521,12 +544,15 @@ end
 
 local function updateCategoryHighlights()
 	for key, btn in pairs(categoryButtons) do
+		local ind = catIndicators[key]
 		if key == currentCategory then
 			TweenService:Create(btn, tweenFade, {BackgroundColor3 = C.SlotHover, BackgroundTransparency = 0}):Play()
 			btn.TextColor3 = C.GoldTxt
+			if ind then TweenService:Create(ind, tweenFade, {BackgroundTransparency = 0}):Play() end
 		else
 			TweenService:Create(btn, tweenFade, {BackgroundColor3 = C.SlotTop, BackgroundTransparency = 0.3}):Play()
 			btn.TextColor3 = C.Label
+			if ind then TweenService:Create(ind, tweenFade, {BackgroundTransparency = 1}):Play() end
 		end
 	end
 end
@@ -624,9 +650,33 @@ local function openBuildMenu()
 	Instance.new("UICorner", xBtn).CornerRadius = UDim.new(0, 6)
 	xBtn.MouseButton1Click:Connect(function() closeBuildMenu() end)
 
+	-- === MEANDER DIVIDER (Greek key pattern) ===
+	local meanderBar = Instance.new("Frame")
+	meanderBar.Size = UDim2.new(1, -24, 0, 2)
+	meanderBar.Position = UDim2.new(0, 12, 0, 43)
+	meanderBar.BackgroundColor3 = C.Gold
+	meanderBar.BackgroundTransparency = 0.7
+	meanderBar.BorderSizePixel = 0
+	meanderBar.Parent = main
+	-- Dashed effect via UIGradient
+	local meanderGrad = Instance.new("UIGradient")
+	meanderGrad.Color = ColorSequence.new({
+		ColorSequenceKeypoint.new(0, Color3.new(1,1,1)),
+		ColorSequenceKeypoint.new(1, Color3.new(1,1,1)),
+	})
+	meanderGrad.Transparency = NumberSequence.new({
+		NumberSequenceKeypoint.new(0, 0),
+		NumberSequenceKeypoint.new(0.46, 0),
+		NumberSequenceKeypoint.new(0.47, 0.8),
+		NumberSequenceKeypoint.new(0.53, 0.8),
+		NumberSequenceKeypoint.new(0.54, 0),
+		NumberSequenceKeypoint.new(1, 0),
+	})
+	meanderGrad.Parent = meanderBar
+
 	-- === SIDEBAR ===
 	local sidebar = Instance.new("ScrollingFrame")
-	sidebar.Size = UDim2.new(0, SIDEBAR_W, 1, -52); sidebar.Position = UDim2.new(0, 8, 0, 44)
+	sidebar.Size = UDim2.new(0, SIDEBAR_W, 1, -68); sidebar.Position = UDim2.new(0, 8, 0, 46)
 	sidebar.BackgroundColor3 = C.PanelTop; sidebar.BackgroundTransparency = 0.5
 	sidebar.BorderSizePixel = 0; sidebar.ScrollBarThickness = 0
 	sidebar.CanvasSize = UDim2.new(0, 0, 0, 0); sidebar.AutomaticCanvasSize = Enum.AutomaticSize.Y
@@ -639,6 +689,7 @@ local function openBuildMenu()
 	sPad.PaddingLeft = UDim.new(0, 4); sPad.PaddingRight = UDim.new(0, 4)
 
 	categoryButtons = {}
+	local catIndicators = {}
 	for i, cat in ipairs(BuildingConfig.Categories) do
 		local btn = Instance.new("TextButton")
 		btn.Size = UDim2.new(1, 0, 0, 28)
@@ -647,7 +698,17 @@ local function openBuildMenu()
 		btn.Text = cat.DisplayName; btn.TextXAlignment = Enum.TextXAlignment.Left
 		btn.AutoButtonColor = false; btn.LayoutOrder = i; btn.Parent = sidebar
 		Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 4)
-		Instance.new("UIPadding", btn).PaddingLeft = UDim.new(0, 6)
+		Instance.new("UIPadding", btn).PaddingLeft = UDim.new(0, 10)
+		-- Gold left indicator bar
+		local indicator = Instance.new("Frame")
+		indicator.Size = UDim2.new(0, 3, 0.6, 0)
+		indicator.Position = UDim2.new(0, 0, 0.2, 0)
+		indicator.BackgroundColor3 = C.Gold
+		indicator.BackgroundTransparency = 1
+		indicator.BorderSizePixel = 0
+		indicator.Parent = btn
+		Instance.new("UICorner", indicator).CornerRadius = UDim.new(0, 2)
+		catIndicators[cat.Key] = indicator
 		categoryButtons[cat.Key] = btn
 		btn.MouseButton1Click:Connect(function()
 			playUISound(SOUNDS.CategoryClick, 0.35)
@@ -658,11 +719,29 @@ local function openBuildMenu()
 	end
 	updateCategoryHighlights()
 
+	-- === VERTICAL DIVIDER ===
+	local vDiv = Instance.new("Frame")
+	vDiv.Size = UDim2.new(0, 1, 1, -60)
+	vDiv.Position = UDim2.new(0, SIDEBAR_W + 10, 0, 48)
+	vDiv.BackgroundColor3 = C.GoldDim
+	vDiv.BackgroundTransparency = 0.5
+	vDiv.BorderSizePixel = 0
+	vDiv.Parent = main
+	local vDivGrad = Instance.new("UIGradient")
+	vDivGrad.Transparency = NumberSequence.new({
+		NumberSequenceKeypoint.new(0, 1),
+		NumberSequenceKeypoint.new(0.15, 0),
+		NumberSequenceKeypoint.new(0.85, 0),
+		NumberSequenceKeypoint.new(1, 1),
+	})
+	vDivGrad.Rotation = 90
+	vDivGrad.Parent = vDiv
+
 	-- === CENTER GRID ===
 	local GRID_X = SIDEBAR_W + 16
 	gridContainer = Instance.new("ScrollingFrame")
-	gridContainer.Size = UDim2.new(1, -(GRID_X + 8), 1, -52)
-	gridContainer.Position = UDim2.new(0, GRID_X, 0, 44)
+	gridContainer.Size = UDim2.new(1, -(GRID_X + 8), 1, -68)
+	gridContainer.Position = UDim2.new(0, GRID_X, 0, 46)
 	gridContainer.BackgroundTransparency = 1; gridContainer.BorderSizePixel = 0
 	gridContainer.ScrollBarThickness = 4; gridContainer.ScrollBarImageColor3 = C.GoldDim
 	gridContainer.Parent = main
@@ -674,10 +753,26 @@ local function openBuildMenu()
 	gPad.PaddingTop = UDim.new(0, 4); gPad.PaddingLeft = UDim.new(0, 4); gPad.PaddingRight = UDim.new(0, 4)
 	populateGrid()
 
+	-- === HOTKEY HINTS BAR ===
+	local hotkeyBar = Instance.new("Frame")
+	hotkeyBar.Size = UDim2.new(1, 0, 0, 18)
+	hotkeyBar.Position = UDim2.new(0, 0, 1, -18)
+	hotkeyBar.BackgroundTransparency = 1
+	hotkeyBar.BorderSizePixel = 0
+	hotkeyBar.Parent = main
+
+	local hotkeyLabel = Instance.new("TextLabel")
+	hotkeyLabel.Size = UDim2.new(1, 0, 1, 0)
+	hotkeyLabel.BackgroundTransparency = 1
+	hotkeyLabel.Text = "[B] Menu    [R] Rotate    [T] Snap Mode    [G] Grid    [V] Reset"
+	hotkeyLabel.TextColor3 = C.Key
+	hotkeyLabel.TextSize = 9; hotkeyLabel.Font = Enum.Font.Gotham
+	hotkeyLabel.Parent = hotkeyBar
+
 	-- === DETAIL STRIP (bottom, starts collapsed) ===
 	detailStrip = Instance.new("Frame"); detailStrip.Name = "DetailStrip"
 	detailStrip.Size = UDim2.new(1, -2, 0, 0)
-	detailStrip.Position = UDim2.new(0, 1, 1, 0)
+	detailStrip.Position = UDim2.new(0, 1, 1, -20)
 	detailStrip.AnchorPoint = Vector2.new(0, 1)
 	detailStrip.BackgroundColor3 = C.SlotTop; detailStrip.BorderSizePixel = 0
 	detailStrip.ClipsDescendants = true; detailStrip.ZIndex = 5
