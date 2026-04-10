@@ -120,6 +120,7 @@ local searchText = ""
 local gridContainer = nil
 local detailStrip = nil
 local categoryButtons = {}
+local catIndicators = {}
 local viewportConnections = {}
 
 -- =============================================
@@ -689,7 +690,7 @@ local function openBuildMenu()
 	sPad.PaddingLeft = UDim.new(0, 4); sPad.PaddingRight = UDim.new(0, 4)
 
 	categoryButtons = {}
-	local catIndicators = {}
+	catIndicators = {}
 	for i, cat in ipairs(BuildingConfig.Categories) do
 		local btn = Instance.new("TextButton")
 		btn.Size = UDim2.new(1, 0, 0, 28)
@@ -801,7 +802,7 @@ function closeBuildMenu()
 		end
 	end
 
-	menuOpen = false; gridContainer = nil; detailStrip = nil; categoryButtons = {}; searchText = ""
+	menuOpen = false; gridContainer = nil; detailStrip = nil; categoryButtons = {}; catIndicators = {}; searchText = ""
 end
 
 -- =============================================
