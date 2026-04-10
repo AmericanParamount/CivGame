@@ -315,7 +315,7 @@ end
 -- BUILD MENU — DETAIL STRIP (bottom overlay)
 -- =============================================
 local SIDEBAR_W = 85
-local STRIP_H = 80
+local STRIP_H = 90
 
 local function updateDetailStrip()
 	if not detailStrip then return end
@@ -339,81 +339,106 @@ local function updateDetailStrip()
 		TweenService:Create(gridContainer, tweenSlide, {Size = UDim2.new(1, -(SIDEBAR_W + 16 + 8), 1, -68 - STRIP_H - 4)}):Play()
 	end
 
-	-- Gold divider line at top
+	-- Solid gold top border (high visibility)
 	local div = Instance.new("Frame")
 	div.Name = "StripDivider"
 	div.Size = UDim2.new(1, 0, 0, 2)
 	div.Position = UDim2.new(0, 0, 0, 0)
 	div.BackgroundColor3 = C.Gold
-	div.BackgroundTransparency = 0.2
+	div.BackgroundTransparency = 0
 	div.BorderSizePixel = 0
+	div.ZIndex = 6
 	div.Parent = detailStrip
+
+	-- Strip inner background (brighter than panel for contrast)
+	local stripBg = Instance.new("Frame")
+	stripBg.Size = UDim2.new(1, 0, 1, -2)
+	stripBg.Position = UDim2.new(0, 0, 0, 2)
+	stripBg.BackgroundColor3 = Color3.fromRGB(28, 50, 50)
+	stripBg.BorderSizePixel = 0
+	stripBg.ZIndex = 5
+	stripBg.Parent = detailStrip
+	Instance.new("UICorner", stripBg).CornerRadius = UDim.new(0, 6)
+	-- Subtle gradient for depth
+	local stripGrad = Instance.new("UIGradient")
+	stripGrad.Color = ColorSequence.new({
+		ColorSequenceKeypoint.new(0, Color3.fromRGB(34, 58, 58)),
+		ColorSequenceKeypoint.new(1, Color3.fromRGB(22, 40, 40)),
+	})
+	stripGrad.Rotation = 90
+	stripGrad.Parent = stripBg
 
 	-- Viewport preview (left)
 	local vpWrap = Instance.new("Frame")
-	vpWrap.Size = UDim2.new(0, 62, 0, 62)
-	vpWrap.Position = UDim2.new(0, 10, 0.5, -31)
-	vpWrap.AnchorPoint = Vector2.new(0, 0)
+	vpWrap.Size = UDim2.new(0, 66, 0, 66)
+	vpWrap.Position = UDim2.new(0, 12, 0.5, -31)
 	vpWrap.BackgroundColor3 = C.IconBg
 	vpWrap.BorderSizePixel = 0
+	vpWrap.ZIndex = 6
 	vpWrap.Parent = detailStrip
 	Instance.new("UICorner", vpWrap).CornerRadius = UDim.new(0, 6)
 	local vpStroke = Instance.new("UIStroke"); vpStroke.Color = C.GoldDim; vpStroke.Thickness = 1; vpStroke.Parent = vpWrap
-	createViewportPreview(vpWrap, selectedBuilding, UDim2.new(1, -4, 1, -4))
+	local vpf = createViewportPreview(vpWrap, selectedBuilding, UDim2.new(1, -4, 1, -4))
+	vpf.ZIndex = 7
 
-	-- Info (middle)
-	local infoX = 82
+	-- Info (middle) — larger text, brighter colors
+	local infoX = 90
 	local nameLabel = Instance.new("TextLabel")
-	nameLabel.Size = UDim2.new(1, -(infoX + 130), 0, 20)
-	nameLabel.Position = UDim2.new(0, infoX, 0, 6)
+	nameLabel.Size = UDim2.new(1, -(infoX + 140), 0, 22)
+	nameLabel.Position = UDim2.new(0, infoX, 0, 8)
 	nameLabel.BackgroundTransparency = 1
 	nameLabel.Text = config.DisplayName
-	nameLabel.TextColor3 = cb and C.GoldTxt or C.Key
-	nameLabel.TextSize = 14; nameLabel.Font = Enum.Font.GothamBold
+	nameLabel.TextColor3 = cb and C.GoldBright or C.Key
+	nameLabel.TextSize = 16; nameLabel.Font = Enum.Font.GothamBold
 	nameLabel.TextXAlignment = Enum.TextXAlignment.Left
+	nameLabel.ZIndex = 6
 	nameLabel.Parent = detailStrip
 
 	local descLabel = Instance.new("TextLabel")
-	descLabel.Size = UDim2.new(1, -(infoX + 130), 0, 14)
-	descLabel.Position = UDim2.new(0, infoX, 0, 26)
+	descLabel.Size = UDim2.new(1, -(infoX + 140), 0, 16)
+	descLabel.Position = UDim2.new(0, infoX, 0, 30)
 	descLabel.BackgroundTransparency = 1
 	descLabel.Text = config.Description or ""
 	descLabel.TextColor3 = C.Label
-	descLabel.TextSize = 10; descLabel.Font = Enum.Font.Gotham
+	descLabel.TextSize = 11; descLabel.Font = Enum.Font.Gotham
 	descLabel.TextXAlignment = Enum.TextXAlignment.Left
 	descLabel.TextTruncate = Enum.TextTruncate.AtEnd
+	descLabel.ZIndex = 6
 	descLabel.Parent = detailStrip
 
 	local costLabel = Instance.new("TextLabel")
-	costLabel.Size = UDim2.new(1, -(infoX + 130), 0, 14)
-	costLabel.Position = UDim2.new(0, infoX, 0, 44)
+	costLabel.Size = UDim2.new(1, -(infoX + 140), 0, 16)
+	costLabel.Position = UDim2.new(0, infoX, 0, 48)
 	costLabel.BackgroundTransparency = 1
 	costLabel.Text = "Cost: " .. BuildingConfig.GetCostString(selectedBuilding)
-	costLabel.TextColor3 = C.GoldDim
-	costLabel.TextSize = 10; costLabel.Font = Enum.Font.Gotham
+	costLabel.TextColor3 = C.GoldTxt
+	costLabel.TextSize = 11; costLabel.Font = Enum.Font.GothamBold
 	costLabel.TextXAlignment = Enum.TextXAlignment.Left
+	costLabel.ZIndex = 6
 	costLabel.Parent = detailStrip
 
 	local reqLabel = Instance.new("TextLabel")
-	reqLabel.Size = UDim2.new(1, -(infoX + 130), 0, 14)
-	reqLabel.Position = UDim2.new(0, infoX, 0, 58)
+	reqLabel.Size = UDim2.new(1, -(infoX + 140), 0, 16)
+	reqLabel.Position = UDim2.new(0, infoX, 0, 64)
 	reqLabel.BackgroundTransparency = 1
 	reqLabel.Text = "Requires: " .. BuildingConfig.GetRequirementString(selectedBuilding)
 	reqLabel.TextColor3 = cb and C.Green or C.Danger
-	reqLabel.TextSize = 10; reqLabel.Font = Enum.Font.Gotham
+	reqLabel.TextSize = 11; reqLabel.Font = Enum.Font.GothamBold
 	reqLabel.TextXAlignment = Enum.TextXAlignment.Left
+	reqLabel.ZIndex = 6
 	reqLabel.Parent = detailStrip
 
 	-- Place button (right) with gold gradient
 	local placeBtn = Instance.new("TextButton")
-	placeBtn.Size = UDim2.new(0, 116, 0, 36)
-	placeBtn.Position = UDim2.new(1, -124, 0.5, -18)
+	placeBtn.Size = UDim2.new(0, 120, 0, 40)
+	placeBtn.Position = UDim2.new(1, -130, 0.5, -20)
 	placeBtn.BackgroundColor3 = cb and C.Gold or C.Key
 	placeBtn.BorderSizePixel = 0
 	placeBtn.TextColor3 = cb and C.Panel or C.Label
-	placeBtn.TextSize = 12; placeBtn.Font = Enum.Font.GothamBold
+	placeBtn.TextSize = 14; placeBtn.Font = Enum.Font.GothamBold
 	placeBtn.Text = cb and "PLACE" or "LOCKED"
 	placeBtn.AutoButtonColor = cb
+	placeBtn.ZIndex = 6
 	placeBtn.Parent = detailStrip
 	Instance.new("UICorner", placeBtn).CornerRadius = UDim.new(0, 6)
 	if cb then
@@ -425,7 +450,7 @@ local function updateDetailStrip()
 		btnGrad.Rotation = 90
 		btnGrad.Parent = placeBtn
 		local btnStroke = Instance.new("UIStroke")
-		btnStroke.Color = C.GoldBright; btnStroke.Thickness = 1; btnStroke.Parent = placeBtn
+		btnStroke.Color = C.GoldBright; btnStroke.Thickness = 1.5; btnStroke.Parent = placeBtn
 	end
 
 	if cb then
