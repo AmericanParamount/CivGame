@@ -200,7 +200,7 @@ local playerDrinkCooldowns = {}
 local DRINK_RANGE = 14
 local DRINK_COOLDOWN = 3
 local DRINK_THIRST_RESTORE = 30
-local DRINK_SOUND_START = "rbxassetid://6489186931"
+local DRINK_SOUND_START = "rbxassetid://257001402"
 local DRINK_SOUND_GULP  = "rbxassetid://257001402"
 
 local function isPlayerNearWater(player)

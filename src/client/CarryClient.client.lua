@@ -51,7 +51,7 @@ local PT = { TextDark = Color3.fromRGB(62,48,32), TextMedium = Color3.fromRGB(10
 
 local CARRY_ANIM_ID = "rbxassetid://122185740653253"
 local DRINK_ANIM_ID = "rbxassetid://0"
-local DRINK_SPLASH_SOUND = "rbxassetid://6489186931"
+local DRINK_SPLASH_SOUND = "rbxassetid://257001402"
 local PICKUP_RANGE = 5
 local isCarrying, isPlantable, carryVariant, carryTrack = false, false, 1, nil
 local ghostModel, ghostValid, ghostRotation = nil, false, 0
