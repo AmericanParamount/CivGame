@@ -27,8 +27,27 @@ local playerGui = player:WaitForChild("PlayerGui")
 local mouse = player:GetMouse()
 local camera = workspace.CurrentCamera
 
+local TweenService = game:GetService("TweenService")
+
 local UI = { ToolbarPanel = "rbxassetid://84324990884668", Tooltip = "rbxassetid://106526935100610" }
-local PT = { TextDark = Color3.fromRGB(62,48,32), TextMedium = Color3.fromRGB(100,80,55), TextLight = Color3.fromRGB(140,120,85), Gold = Color3.fromRGB(180,145,55), GoldDim = Color3.fromRGB(140,112,50), WaterBlue = Color3.fromRGB(45,130,190) }
+-- Palette (unified with HUD)
+local C = {
+	Panel      = Color3.fromRGB(15, 30, 30),
+	PanelTop   = Color3.fromRGB(18, 36, 36),
+	SlotTop    = Color3.fromRGB(22, 40, 40),
+	Gold       = Color3.fromRGB(184, 148, 62),
+	GoldDim    = Color3.fromRGB(107, 90, 42),
+	GoldTxt    = Color3.fromRGB(212, 184, 106),
+	GoldWarm   = Color3.fromRGB(212, 170, 74),
+	Label      = Color3.fromRGB(138, 154, 138),
+	Key        = Color3.fromRGB(90, 106, 90),
+	Danger     = Color3.fromRGB(160, 64, 40),
+	Water      = Color3.fromRGB(70, 155, 210),
+	WaterDark  = Color3.fromRGB(30, 80, 120),
+	WaterBright= Color3.fromRGB(100, 190, 240),
+}
+-- Keep old PT for carry indicator compatibility
+local PT = { TextDark = Color3.fromRGB(62,48,32), TextMedium = Color3.fromRGB(100,80,55), TextLight = Color3.fromRGB(140,120,85), Gold = Color3.fromRGB(180,145,55), GoldDim = Color3.fromRGB(140,112,50), WaterBlue = C.Water }
 
 local CARRY_ANIM_ID = "rbxassetid://122185740653253"
 local DRINK_ANIM_ID = "rbxassetid://0"
@@ -77,20 +96,64 @@ local label = Instance.new("TextLabel"); label.Size = UDim2.new(1,0,1,-6)
 label.BackgroundTransparency = 1; label.Text = ""; label.TextColor3 = PT.TextDark
 label.TextSize = 13; label.Font = Enum.Font.GothamBold; label.Parent = carryBg
 
-local wGui = Instance.new("ScreenGui"); wGui.Name = "WaterCursorGui"; wGui.ResetOnSpawn = false; wGui.Parent = playerGui
-local wFrame = Instance.new("ImageLabel"); wFrame.Name = "WaterPrompt"
-wFrame.Size = UDim2.new(0,160,0,55); wFrame.BackgroundTransparency = 1
-wFrame.Image = UI.Tooltip; wFrame.ScaleType = Enum.ScaleType.Stretch; wFrame.Visible = false; wFrame.Parent = wGui
-local wText = Instance.new("TextLabel"); wText.Size = UDim2.new(1,0,0,18); wText.Position = UDim2.new(0,0,0,8)
-wText.BackgroundTransparency = 1; wText.Text = "[Hold E] Drink"; wText.TextColor3 = PT.WaterBlue
-wText.TextSize = 12; wText.Font = Enum.Font.GothamBold; wText.Parent = wFrame
-local dBarBg = Instance.new("Frame"); dBarBg.Size = UDim2.new(0.8,0,0,8); dBarBg.Position = UDim2.new(0.1,0,0,30)
-dBarBg.BackgroundColor3 = Color3.fromRGB(180,170,150); dBarBg.BackgroundTransparency = 0.3
+-- =============================================
+-- WATER HUD (dark teal + gold, centered prompt)
+-- =============================================
+local wGui = Instance.new("ScreenGui"); wGui.Name = "WaterHUD"; wGui.ResetOnSpawn = false; wGui.Parent = playerGui
+
+-- Drink prompt panel (centered above hotbar)
+local wFrame = Instance.new("Frame"); wFrame.Name = "DrinkPrompt"
+wFrame.Size = UDim2.new(0, 220, 0, 56)
+wFrame.Position = UDim2.new(0.5, -110, 1, -140)
+wFrame.BackgroundColor3 = C.Panel; wFrame.BackgroundTransparency = 0.15
+wFrame.BorderSizePixel = 0; wFrame.Visible = false; wFrame.Parent = wGui
+Instance.new("UICorner", wFrame).CornerRadius = UDim.new(0, 8)
+local wStroke = Instance.new("UIStroke"); wStroke.Color = C.Water; wStroke.Thickness = 1.5
+wStroke.Transparency = 0.3; wStroke.Parent = wFrame
+
+-- Water icon (droplet symbol)
+local wIcon = Instance.new("TextLabel")
+wIcon.Size = UDim2.new(0, 28, 0, 28); wIcon.Position = UDim2.new(0, 10, 0, 8)
+wIcon.BackgroundTransparency = 1; wIcon.Text = "\u{1F4A7}"
+wIcon.TextSize = 20; wIcon.Parent = wFrame
+
+-- Prompt text
+local wText = Instance.new("TextLabel")
+wText.Size = UDim2.new(1, -48, 0, 18); wText.Position = UDim2.new(0, 42, 0, 6)
+wText.BackgroundTransparency = 1; wText.Text = "[Hold E] Drink"
+wText.TextColor3 = C.Water; wText.TextSize = 13; wText.Font = Enum.Font.GothamBold
+wText.TextXAlignment = Enum.TextXAlignment.Left; wText.Parent = wFrame
+
+-- Progress bar
+local dBarBg = Instance.new("Frame")
+dBarBg.Size = UDim2.new(1, -54, 0, 10); dBarBg.Position = UDim2.new(0, 42, 0, 30)
+dBarBg.BackgroundColor3 = C.SlotTop; dBarBg.BackgroundTransparency = 0
 dBarBg.BorderSizePixel = 0; dBarBg.Visible = false; dBarBg.Parent = wFrame
-Instance.new("UICorner", dBarBg).CornerRadius = UDim.new(0,3)
-local dBarFill = Instance.new("Frame"); dBarFill.Size = UDim2.new(0,0,1,0)
-dBarFill.BackgroundColor3 = PT.WaterBlue; dBarFill.BorderSizePixel = 0; dBarFill.Parent = dBarBg
-Instance.new("UICorner", dBarFill).CornerRadius = UDim.new(0,3)
+Instance.new("UICorner", dBarBg).CornerRadius = UDim.new(0, 4)
+local dBarStroke = Instance.new("UIStroke"); dBarStroke.Color = C.GoldDim
+dBarStroke.Thickness = 1; dBarStroke.Parent = dBarBg
+
+local dBarFill = Instance.new("Frame")
+dBarFill.Size = UDim2.new(0, 0, 1, 0)
+dBarFill.BackgroundColor3 = C.Water; dBarFill.BorderSizePixel = 0; dBarFill.Parent = dBarBg
+Instance.new("UICorner", dBarFill).CornerRadius = UDim.new(0, 4)
+-- Fill gradient: dark blue -> bright blue
+local fillGrad = Instance.new("UIGradient")
+fillGrad.Color = ColorSequence.new({
+	ColorSequenceKeypoint.new(0, C.WaterDark),
+	ColorSequenceKeypoint.new(1, C.WaterBright),
+})
+fillGrad.Parent = dBarFill
+
+-- Feedback label (floats up from prompt on success/failure)
+local feedbackLabel = Instance.new("TextLabel")
+feedbackLabel.Size = UDim2.new(0, 300, 0, 24)
+feedbackLabel.Position = UDim2.new(0.5, -150, 1, -180)
+feedbackLabel.BackgroundTransparency = 1
+feedbackLabel.Font = Enum.Font.GothamBold; feedbackLabel.TextSize = 15
+feedbackLabel.TextColor3 = C.Water; feedbackLabel.TextStrokeColor3 = Color3.new(0, 0, 0)
+feedbackLabel.TextStrokeTransparency = 0.5
+feedbackLabel.Visible = false; feedbackLabel.Parent = wGui
 
 -- =============================================
 -- WATER
@@ -121,45 +184,43 @@ local function isPlayerOnDrinkableTerrain()
 	return terrainType and TerrainConfig.CanDrinkOn(terrainType)
 end
 
-local drinkFeedbackLabel = nil
-
 local function showDrinkFeedback(msg, color)
-	if not drinkFeedbackLabel then
-		drinkFeedbackLabel = Instance.new("TextLabel")
-		drinkFeedbackLabel.Size = UDim2.new(0, 300, 0, 30)
-		drinkFeedbackLabel.Position = UDim2.new(0.5, -150, 0, 90)
-		drinkFeedbackLabel.BackgroundTransparency = 1
-		drinkFeedbackLabel.Font = Enum.Font.GothamBold
-		drinkFeedbackLabel.TextSize = 14
-		drinkFeedbackLabel.Parent = gui
-	end
-	drinkFeedbackLabel.Text = msg
-	drinkFeedbackLabel.TextColor3 = color or PT.WaterBlue
-	drinkFeedbackLabel.TextTransparency = 0
-	drinkFeedbackLabel.Visible = true
-	task.delay(2, function()
-		if drinkFeedbackLabel and drinkFeedbackLabel.Text == msg then
-			drinkFeedbackLabel.Visible = false
-		end
+	feedbackLabel.Text = msg
+	feedbackLabel.TextColor3 = color or C.Water
+	feedbackLabel.TextTransparency = 0
+	feedbackLabel.Position = UDim2.new(0.5, -150, 1, -180)
+	feedbackLabel.Visible = true
+	-- Float up + fade out
+	local tweenUp = TweenService:Create(feedbackLabel, TweenInfo.new(1.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+		Position = UDim2.new(0.5, -150, 1, -220),
+		TextTransparency = 1,
+		TextStrokeTransparency = 1,
+	})
+	tweenUp:Play()
+	tweenUp.Completed:Connect(function()
+		feedbackLabel.Visible = false
+		feedbackLabel.TextStrokeTransparency = 0.5
 	end)
 end
 
-local function playSplashSound()
-	local ch = player.Character; if not ch then return end
-	local root = ch:FindFirstChild("HumanoidRootPart"); if not root then return end
+local function playSound(parent, soundId, volume)
 	local s = Instance.new("Sound")
-	s.SoundId = DRINK_SPLASH_SOUND; s.Volume = 0.35; s.Parent = root
+	s.SoundId = soundId; s.Volume = volume or 0.4; s.Parent = parent
 	s:Play()
 	s.Ended:Connect(function() s:Destroy() end)
 	task.delay(3, function() if s.Parent then s:Destroy() end end)
 end
 
 local function startDrinking()
-	if isDrinking or isCarrying then return end; isDrinking = true; drinkProgress = 0
-	local ch = player.Character; if ch then local h = ch:FindFirstChildOfClass("Humanoid")
-		if h then savedWalkSpeed = h.WalkSpeed; h.WalkSpeed = 0 end end
-	-- Play splash sound on start
-	playSplashSound()
+	if isDrinking or isCarrying then return end
+	isDrinking = true; drinkProgress = 0
+	local ch = player.Character
+	if ch then
+		local h = ch:FindFirstChildOfClass("Humanoid")
+		if h then savedWalkSpeed = h.WalkSpeed; h.WalkSpeed = 0 end
+		local root = ch:FindFirstChild("HumanoidRootPart")
+		if root then playSound(root, DRINK_SPLASH_SOUND, 0.3) end
+	end
 	-- Animation (if asset provided)
 	if DRINK_ANIM_ID ~= "rbxassetid://0" then
 		local ch2 = player.Character; if ch2 then local hum = ch2:FindFirstChildOfClass("Humanoid"); if hum then
@@ -168,33 +229,45 @@ local function startDrinking()
 			drinkTrack = an:LoadAnimation(anim); drinkTrack.Priority = Enum.AnimationPriority.Action; drinkTrack.Looped = true; drinkTrack:Play(0.3)
 		end end
 	end
-	wText.Text = "Drinking..."; wText.TextColor3 = PT.WaterBlue
-	dBarBg.Visible = true; dBarFill.Size = UDim2.new(0,0,1,0)
+	-- UI: switch to "drinking" state
+	wText.Text = "Drinking..."; wText.TextColor3 = C.WaterBright
+	wStroke.Color = C.WaterBright
+	dBarBg.Visible = true; dBarFill.Size = UDim2.new(0, 0, 1, 0)
 end
+
+local function resetDrinkUI()
+	isDrinking = false; drinkProgress = 0
+	local ch = player.Character; if ch then
+		local h = ch:FindFirstChildOfClass("Humanoid")
+		if h then h.WalkSpeed = savedWalkSpeed end
+	end
+	if drinkTrack and drinkTrack.IsPlaying then drinkTrack:Stop(0.3) end; drinkTrack = nil
+	dBarBg.Visible = false; dBarFill.Size = UDim2.new(0, 0, 1, 0)
+	wText.Text = "[Hold E] Drink"; wText.TextColor3 = C.Water
+	wStroke.Color = C.Water
+end
+
 local function cancelDrinking()
-	if not isDrinking then return end; isDrinking = false; drinkProgress = 0
-	local ch = player.Character; if ch then local h = ch:FindFirstChildOfClass("Humanoid"); if h then h.WalkSpeed = savedWalkSpeed end end
-	if drinkTrack and drinkTrack.IsPlaying then drinkTrack:Stop(0.3) end; drinkTrack = nil
-	dBarBg.Visible = false; dBarFill.Size = UDim2.new(0,0,1,0); wText.Text = "[Hold E] Drink"; wText.TextColor3 = PT.WaterBlue
+	if not isDrinking then return end
+	resetDrinkUI()
 end
+
 local function completeDrinking()
-	if not isDrinking then return end; isDrinking = false; drinkProgress = 0
-	local ch = player.Character; if ch then local h = ch:FindFirstChildOfClass("Humanoid"); if h then h.WalkSpeed = savedWalkSpeed end end
-	if drinkTrack and drinkTrack.IsPlaying then drinkTrack:Stop(0.3) end; drinkTrack = nil
-	dBarBg.Visible = false; dBarFill.Size = UDim2.new(0,0,1,0); wText.Text = "[Hold E] Drink"; wText.TextColor3 = PT.WaterBlue
+	if not isDrinking then return end
+	resetDrinkUI()
 	if DrinkWaterEvent then DrinkWaterEvent:FireServer() end
 end
 
--- Server response: success/failure feedback
+-- Server response: floating feedback
 if DrinkWaterEvent then
 	DrinkWaterEvent.OnClientEvent:Connect(function(success, data)
 		if success then
-			showDrinkFeedback("+" .. tostring(data) .. " Thirst", Color3.fromRGB(45, 160, 220))
+			showDrinkFeedback("+" .. tostring(data) .. " Thirst", C.WaterBright)
 		else
 			if data == "cooldown" then
-				showDrinkFeedback("Wait before drinking again", Color3.fromRGB(200, 160, 60))
+				showDrinkFeedback("Wait before drinking again", C.GoldWarm)
 			elseif data == "no_water" then
-				showDrinkFeedback("No water source nearby", Color3.fromRGB(180, 80, 60))
+				showDrinkFeedback("No water nearby", C.Danger)
 			end
 		end
 	end)
@@ -442,13 +515,19 @@ RunService.RenderStepped:Connect(function(dt)
 
 	if not isCarrying and not isDrinking then
 		hoveringWater = isMouseOverWater() or isPlayerOnDrinkableTerrain()
-		if hoveringWater then wFrame.Visible = true; wFrame.Position = UDim2.new(0, mouse.X+16, 0, mouse.Y-10) else wFrame.Visible = false end
+		wFrame.Visible = hoveringWater
 	elseif isDrinking then
 		wFrame.Visible = true
-		-- Cancel if player moves away from water AND mouse leaves water
 		if not isMouseOverWater() and not isPlayerOnDrinkableTerrain() then cancelDrinking() end
-	else hoveringWater = false; wFrame.Visible = false end
-	if isDrinking then drinkProgress += dt; local r = math.clamp(drinkProgress/DRINK_DURATION,0,1); dBarFill.Size = UDim2.new(r,0,1,0); if r >= 1 then completeDrinking() end end
+	else
+		hoveringWater = false; wFrame.Visible = false
+	end
+	if isDrinking then
+		drinkProgress += dt
+		local r = math.clamp(drinkProgress / DRINK_DURATION, 0, 1)
+		dBarFill.Size = UDim2.new(r, 0, 1, 0)
+		if r >= 1 then completeDrinking() end
+	end
 end)
 
 -- Server state
