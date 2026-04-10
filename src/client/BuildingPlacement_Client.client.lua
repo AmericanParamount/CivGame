@@ -626,7 +626,9 @@ local function openBuildMenu()
 
 	topBar.InputBegan:Connect(function(input)
 		if input.UserInputType == Enum.UserInputType.MouseButton1 then
-			dragging = true; dragStart = input.Position; startPos = main.Position
+			dragging = true; dragStart = input.Position
+			-- Convert to pure offset so clamping works correctly
+			startPos = UDim2.new(0, main.AbsolutePosition.X, 0, main.AbsolutePosition.Y)
 		end
 	end)
 	topBar.InputEnded:Connect(function(input)
@@ -635,7 +637,15 @@ local function openBuildMenu()
 	UserInputService.InputChanged:Connect(function(input)
 		if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
 			local delta = input.Position - dragStart
-			main.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+			local newX = startPos.X.Offset + delta.X
+			local newY = startPos.Y.Offset + delta.Y
+			-- Clamp so the full panel stays on screen
+			local vs = camera.ViewportSize
+			local panelW = main.AbsoluteSize.X
+			local panelH = main.AbsoluteSize.Y
+			newX = math.clamp(newX, 0, vs.X - panelW)
+			newY = math.clamp(newY, 0, vs.Y - panelH)
+			main.Position = UDim2.new(0, newX, 0, newY)
 		end
 	end)
 
