@@ -350,11 +350,12 @@ local function updateDetailStrip()
 	div.ZIndex = 6
 	div.Parent = detailStrip
 
-	-- Strip inner background (brighter than panel for contrast)
+	-- Strip inner background (brighter, semi-transparent for see-through)
 	local stripBg = Instance.new("Frame")
 	stripBg.Size = UDim2.new(1, 0, 1, -2)
 	stripBg.Position = UDim2.new(0, 0, 0, 2)
 	stripBg.BackgroundColor3 = Color3.fromRGB(28, 50, 50)
+	stripBg.BackgroundTransparency = 0.15
 	stripBg.BorderSizePixel = 0
 	stripBg.ZIndex = 5
 	stripBg.Parent = detailStrip
@@ -494,6 +495,7 @@ local function populateGrid()
 		local tile = Instance.new("TextButton"); tile.Name = name
 		tile.Size = UDim2.new(0, 1, 0, 1)
 		tile.BackgroundColor3 = C.SlotTop
+		tile.BackgroundTransparency = 0.25
 		tile.BorderSizePixel = 0
 		tile.Text = ""
 		tile.AutoButtonColor = false
@@ -503,16 +505,17 @@ local function populateGrid()
 		local stroke = Instance.new("UIStroke"); stroke.Parent = tile
 		stroke.Color = (name == selectedBuilding) and C.GoldWarm or C.GoldDim
 		stroke.Thickness = (name == selectedBuilding) and 2 or 1
-		stroke.Transparency = cb and 0 or 0.5
+		stroke.Transparency = cb and 0.15 or 0.5
 
-		if not cb then tile.BackgroundTransparency = 0.3 end
+		if not cb then tile.BackgroundTransparency = 0.5 end
 
-		-- Selected inner glow
+		-- Selected: slightly less transparent + inner glow
 		if name == selectedBuilding then
+			tile.BackgroundTransparency = 0.1
 			local glow = Instance.new("Frame")
 			glow.Size = UDim2.new(1, 0, 1, 0)
 			glow.BackgroundColor3 = C.Gold
-			glow.BackgroundTransparency = 0.92
+			glow.BackgroundTransparency = 0.9
 			glow.BorderSizePixel = 0
 			glow.ZIndex = 1
 			glow.Parent = tile
@@ -545,14 +548,14 @@ local function populateGrid()
 		tile.MouseEnter:Connect(function()
 			playUISound(SOUNDS.TileHover, 0.2)
 			if name ~= selectedBuilding then
-				TweenService:Create(tile, tweenHoverIn, {BackgroundColor3 = C.SlotHover}):Play()
-				TweenService:Create(stroke, tweenHoverIn, {Color = C.Gold}):Play()
+				TweenService:Create(tile, tweenHoverIn, {BackgroundColor3 = C.SlotHover, BackgroundTransparency = 0.15}):Play()
+				TweenService:Create(stroke, tweenHoverIn, {Color = C.Gold, Transparency = 0}):Play()
 			end
 		end)
 		tile.MouseLeave:Connect(function()
 			if name ~= selectedBuilding then
-				TweenService:Create(tile, tweenHoverOut, {BackgroundColor3 = C.SlotTop}):Play()
-				TweenService:Create(stroke, tweenHoverOut, {Color = C.GoldDim}):Play()
+				TweenService:Create(tile, tweenHoverOut, {BackgroundColor3 = C.SlotTop, BackgroundTransparency = 0.25}):Play()
+				TweenService:Create(stroke, tweenHoverOut, {Color = C.GoldDim, Transparency = 0.15}):Play()
 			end
 		end)
 
@@ -572,11 +575,11 @@ local function updateCategoryHighlights()
 	for key, btn in pairs(categoryButtons) do
 		local ind = catIndicators[key]
 		if key == currentCategory then
-			TweenService:Create(btn, tweenFade, {BackgroundColor3 = C.SlotHover, BackgroundTransparency = 0}):Play()
+			TweenService:Create(btn, tweenFade, {BackgroundColor3 = C.SlotHover, BackgroundTransparency = 0.2}):Play()
 			btn.TextColor3 = C.GoldTxt
 			if ind then TweenService:Create(ind, tweenFade, {BackgroundTransparency = 0}):Play() end
 		else
-			TweenService:Create(btn, tweenFade, {BackgroundColor3 = C.SlotTop, BackgroundTransparency = 0.3}):Play()
+			TweenService:Create(btn, tweenFade, {BackgroundColor3 = C.SlotTop, BackgroundTransparency = 0.5}):Play()
 			btn.TextColor3 = C.Label
 			if ind then TweenService:Create(ind, tweenFade, {BackgroundTransparency = 1}):Play() end
 		end
@@ -600,6 +603,7 @@ local function openBuildMenu()
 	main.Size = UDim2.new(0.5, 0, 0.6, 0)
 	main.Position = UDim2.new(0.25, 0, 0.15, 0)
 	main.BackgroundColor3 = C.Panel
+	main.BackgroundTransparency = 0.15
 	main.BorderSizePixel = 0
 	main.Parent = menuGui
 	Instance.new("UICorner", main).CornerRadius = UDim.new(0, 10)
@@ -616,7 +620,7 @@ local function openBuildMenu()
 	-- === TOP BAR ===
 	local topBar = Instance.new("TextButton"); topBar.Name = "TopBar"
 	topBar.Size = UDim2.new(1, -16, 0, 36); topBar.Position = UDim2.new(0, 8, 0, 6)
-	topBar.BackgroundColor3 = C.PanelTop; topBar.BackgroundTransparency = 0.5
+	topBar.BackgroundColor3 = C.PanelTop; topBar.BackgroundTransparency = 0.6
 	topBar.BorderSizePixel = 0; topBar.Text = ""; topBar.AutoButtonColor = false
 	topBar.Parent = main
 	Instance.new("UICorner", topBar).CornerRadius = UDim.new(0, 8)
@@ -713,7 +717,7 @@ local function openBuildMenu()
 	-- === SIDEBAR ===
 	local sidebar = Instance.new("ScrollingFrame")
 	sidebar.Size = UDim2.new(0, SIDEBAR_W, 1, -68); sidebar.Position = UDim2.new(0, 8, 0, 46)
-	sidebar.BackgroundColor3 = C.PanelTop; sidebar.BackgroundTransparency = 0.5
+	sidebar.BackgroundColor3 = C.PanelTop; sidebar.BackgroundTransparency = 0.7
 	sidebar.BorderSizePixel = 0; sidebar.ScrollBarThickness = 0
 	sidebar.CanvasSize = UDim2.new(0, 0, 0, 0); sidebar.AutomaticCanvasSize = Enum.AutomaticSize.Y
 	sidebar.Parent = main
@@ -729,7 +733,7 @@ local function openBuildMenu()
 	for i, cat in ipairs(BuildingConfig.Categories) do
 		local btn = Instance.new("TextButton")
 		btn.Size = UDim2.new(1, 0, 0, 28)
-		btn.BackgroundColor3 = C.SlotTop; btn.BackgroundTransparency = 0.3; btn.BorderSizePixel = 0
+		btn.BackgroundColor3 = C.SlotTop; btn.BackgroundTransparency = 0.5; btn.BorderSizePixel = 0
 		btn.TextColor3 = C.Label; btn.TextSize = 11; btn.Font = Enum.Font.GothamBold
 		btn.Text = cat.DisplayName; btn.TextXAlignment = Enum.TextXAlignment.Left
 		btn.AutoButtonColor = false; btn.LayoutOrder = i; btn.Parent = sidebar
@@ -760,7 +764,7 @@ local function openBuildMenu()
 	vDiv.Size = UDim2.new(0, 1, 1, -60)
 	vDiv.Position = UDim2.new(0, SIDEBAR_W + 10, 0, 48)
 	vDiv.BackgroundColor3 = C.GoldDim
-	vDiv.BackgroundTransparency = 0.5
+	vDiv.BackgroundTransparency = 0.6
 	vDiv.BorderSizePixel = 0
 	vDiv.Parent = main
 	local vDivGrad = Instance.new("UIGradient")
@@ -810,7 +814,7 @@ local function openBuildMenu()
 	detailStrip.Size = UDim2.new(1, -2, 0, 0)
 	detailStrip.Position = UDim2.new(0, 1, 1, -20)
 	detailStrip.AnchorPoint = Vector2.new(0, 1)
-	detailStrip.BackgroundColor3 = C.SlotTop; detailStrip.BorderSizePixel = 0
+	detailStrip.BackgroundColor3 = C.SlotTop; detailStrip.BackgroundTransparency = 0.2; detailStrip.BorderSizePixel = 0
 	detailStrip.ClipsDescendants = true; detailStrip.ZIndex = 5
 	detailStrip.Parent = main
 	Instance.new("UICorner", detailStrip).CornerRadius = UDim.new(0, 8)
