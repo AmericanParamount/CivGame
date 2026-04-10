@@ -200,7 +200,8 @@ local playerDrinkCooldowns = {}
 local DRINK_RANGE = 14
 local DRINK_COOLDOWN = 3
 local DRINK_THIRST_RESTORE = 30
-local DRINK_SOUND_ID = "rbxassetid://257001402"
+local DRINK_SOUND_START = "rbxassetid://6489186931"
+local DRINK_SOUND_GULP  = "rbxassetid://257001402"
 
 local function isPlayerNearWater(player)
 	local character = player.Character
@@ -208,6 +209,8 @@ local function isPlayerNearWater(player)
 	local root = character:FindFirstChild("HumanoidRootPart")
 	if not root then return false end
 	local playerPos = root.Position
+
+	-- Check Water folder parts
 	local waterFolder = workspace:FindFirstChild("Water")
 	if waterFolder then
 		for _, waterPart in ipairs(waterFolder:GetDescendants()) do
@@ -225,6 +228,12 @@ local function isPlayerNearWater(player)
 			end
 		end
 	end
+
+	-- Check terrain for drinkable water types (Riverbank, Wetland, ShallowWater, DeepWater)
+	local terrainType = TerrainIdentifier.GetTerrainAtPosition(playerPos)
+	if terrainType and TerrainConfig.CanDrinkOn(terrainType) then return true end
+
+	-- Check completed Wells
 	local buildingsFolder = workspace:FindFirstChild("Buildings")
 	if buildingsFolder then
 		for _, building in ipairs(buildingsFolder:GetChildren()) do
@@ -247,13 +256,10 @@ local function tryDrinkWater(player)
 	local now = tick()
 	local lastDrink = playerDrinkCooldowns[player.UserId] or 0
 	if now - lastDrink < DRINK_COOLDOWN then
-		print("[WATER] " .. player.Name .. " drink on cooldown")
-		return false
+		return false, "cooldown"
 	end
-	local nearWater = isPlayerNearWater(player)
-	if not nearWater then
-		print("[WATER] " .. player.Name .. " not near water")
-		return false
+	if not isPlayerNearWater(player) then
+		return false, "no_water"
 	end
 	playerDrinkCooldowns[player.UserId] = now
 	if HydrateFunc then
@@ -266,19 +272,20 @@ local function tryDrinkWater(player)
 	else
 		warn("[WATER] HydrateFunc is nil — cannot hydrate!")
 	end
+	-- Gulp sound at character
 	local character = player.Character
 	if character then
 		local root = character:FindFirstChild("HumanoidRootPart")
 		if root then
 			local s = Instance.new("Sound")
-			s.SoundId = DRINK_SOUND_ID; s.Volume = 0.5
+			s.SoundId = DRINK_SOUND_GULP; s.Volume = 0.6
 			s.RollOffMaxDistance = 30; s.Parent = root
 			s:Play()
 			s.Ended:Connect(function() s:Destroy() end)
 			task.delay(3, function() if s.Parent then s:Destroy() end end)
 		end
 	end
-	return true
+	return true, nil
 end
 
 local function getNodeType(node)
@@ -448,9 +455,11 @@ EatEvent.OnServerEvent:Connect(function(player)
 end)
 
 DrinkWaterEvent.OnServerEvent:Connect(function(player)
-	local result = tryDrinkWater(player)
-	if not result then
-		print("[WATER] Drink failed for " .. player.Name)
+	local ok, reason = tryDrinkWater(player)
+	if ok then
+		DrinkWaterEvent:FireClient(player, true, DRINK_THIRST_RESTORE)
+	else
+		DrinkWaterEvent:FireClient(player, false, reason)
 	end
 end)
 

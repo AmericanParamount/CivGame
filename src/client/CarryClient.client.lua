@@ -32,6 +32,7 @@ local PT = { TextDark = Color3.fromRGB(62,48,32), TextMedium = Color3.fromRGB(10
 
 local CARRY_ANIM_ID = "rbxassetid://122185740653253"
 local DRINK_ANIM_ID = "rbxassetid://0"
+local DRINK_SPLASH_SOUND = "rbxassetid://6489186931"
 local PICKUP_RANGE = 5
 local isCarrying, isPlantable, carryVariant, carryTrack = false, false, 1, nil
 local ghostModel, ghostValid, ghostRotation = nil, false, 0
@@ -102,15 +103,64 @@ end
 local function isMouseOverWater()
 	local ch = player.Character; if not ch then return false end
 	local root = ch:FindFirstChild("HumanoidRootPart"); if not root then return false end
-	local t = mouse.Target; if not t or not isPartInWaterFolder(t) then return false end
 	local hp = mouse.Hit and mouse.Hit.Position; if not hp then return false end
-	return (root.Position - hp).Magnitude <= WATER_HOVER_RANGE
+	if (root.Position - hp).Magnitude > WATER_HOVER_RANGE then return false end
+	-- Check Water folder
+	local t = mouse.Target
+	if t and isPartInWaterFolder(t) then return true end
+	-- Check drinkable terrain at mouse position (Riverbank, Wetland, ShallowWater, DeepWater)
+	local terrainType = TerrainIdentifier.GetTerrainAtPosition(hp)
+	if terrainType and TerrainConfig.CanDrinkOn(terrainType) then return true end
+	return false
+end
+-- Check if player is standing on drinkable terrain (for prompt without mouse)
+local function isPlayerOnDrinkableTerrain()
+	local ch = player.Character; if not ch then return false end
+	local root = ch:FindFirstChild("HumanoidRootPart"); if not root then return false end
+	local terrainType = TerrainIdentifier.GetTerrainAtPosition(root.Position)
+	return terrainType and TerrainConfig.CanDrinkOn(terrainType)
+end
+
+local drinkFeedbackLabel = nil
+
+local function showDrinkFeedback(msg, color)
+	if not drinkFeedbackLabel then
+		drinkFeedbackLabel = Instance.new("TextLabel")
+		drinkFeedbackLabel.Size = UDim2.new(0, 300, 0, 30)
+		drinkFeedbackLabel.Position = UDim2.new(0.5, -150, 0, 90)
+		drinkFeedbackLabel.BackgroundTransparency = 1
+		drinkFeedbackLabel.Font = Enum.Font.GothamBold
+		drinkFeedbackLabel.TextSize = 14
+		drinkFeedbackLabel.Parent = gui
+	end
+	drinkFeedbackLabel.Text = msg
+	drinkFeedbackLabel.TextColor3 = color or PT.WaterBlue
+	drinkFeedbackLabel.TextTransparency = 0
+	drinkFeedbackLabel.Visible = true
+	task.delay(2, function()
+		if drinkFeedbackLabel and drinkFeedbackLabel.Text == msg then
+			drinkFeedbackLabel.Visible = false
+		end
+	end)
+end
+
+local function playSplashSound()
+	local ch = player.Character; if not ch then return end
+	local root = ch:FindFirstChild("HumanoidRootPart"); if not root then return end
+	local s = Instance.new("Sound")
+	s.SoundId = DRINK_SPLASH_SOUND; s.Volume = 0.35; s.Parent = root
+	s:Play()
+	s.Ended:Connect(function() s:Destroy() end)
+	task.delay(3, function() if s.Parent then s:Destroy() end end)
 end
 
 local function startDrinking()
 	if isDrinking or isCarrying then return end; isDrinking = true; drinkProgress = 0
 	local ch = player.Character; if ch then local h = ch:FindFirstChildOfClass("Humanoid")
 		if h then savedWalkSpeed = h.WalkSpeed; h.WalkSpeed = 0 end end
+	-- Play splash sound on start
+	playSplashSound()
+	-- Animation (if asset provided)
 	if DRINK_ANIM_ID ~= "rbxassetid://0" then
 		local ch2 = player.Character; if ch2 then local hum = ch2:FindFirstChildOfClass("Humanoid"); if hum then
 			local anim = Instance.new("Animation"); anim.AnimationId = DRINK_ANIM_ID
@@ -118,20 +168,36 @@ local function startDrinking()
 			drinkTrack = an:LoadAnimation(anim); drinkTrack.Priority = Enum.AnimationPriority.Action; drinkTrack.Looped = true; drinkTrack:Play(0.3)
 		end end
 	end
-	wText.Text = "Drinking..."; dBarBg.Visible = true; dBarFill.Size = UDim2.new(0,0,1,0)
+	wText.Text = "Drinking..."; wText.TextColor3 = PT.WaterBlue
+	dBarBg.Visible = true; dBarFill.Size = UDim2.new(0,0,1,0)
 end
 local function cancelDrinking()
 	if not isDrinking then return end; isDrinking = false; drinkProgress = 0
 	local ch = player.Character; if ch then local h = ch:FindFirstChildOfClass("Humanoid"); if h then h.WalkSpeed = savedWalkSpeed end end
 	if drinkTrack and drinkTrack.IsPlaying then drinkTrack:Stop(0.3) end; drinkTrack = nil
-	dBarBg.Visible = false; dBarFill.Size = UDim2.new(0,0,1,0); wText.Text = "[Hold E] Drink"
+	dBarBg.Visible = false; dBarFill.Size = UDim2.new(0,0,1,0); wText.Text = "[Hold E] Drink"; wText.TextColor3 = PT.WaterBlue
 end
 local function completeDrinking()
 	if not isDrinking then return end; isDrinking = false; drinkProgress = 0
 	local ch = player.Character; if ch then local h = ch:FindFirstChildOfClass("Humanoid"); if h then h.WalkSpeed = savedWalkSpeed end end
 	if drinkTrack and drinkTrack.IsPlaying then drinkTrack:Stop(0.3) end; drinkTrack = nil
-	dBarBg.Visible = false; dBarFill.Size = UDim2.new(0,0,1,0); wText.Text = "[Hold E] Drink"
+	dBarBg.Visible = false; dBarFill.Size = UDim2.new(0,0,1,0); wText.Text = "[Hold E] Drink"; wText.TextColor3 = PT.WaterBlue
 	if DrinkWaterEvent then DrinkWaterEvent:FireServer() end
+end
+
+-- Server response: success/failure feedback
+if DrinkWaterEvent then
+	DrinkWaterEvent.OnClientEvent:Connect(function(success, data)
+		if success then
+			showDrinkFeedback("+" .. tostring(data) .. " Thirst", Color3.fromRGB(45, 160, 220))
+		else
+			if data == "cooldown" then
+				showDrinkFeedback("Wait before drinking again", Color3.fromRGB(200, 160, 60))
+			elseif data == "no_water" then
+				showDrinkFeedback("No water source nearby", Color3.fromRGB(180, 80, 60))
+			end
+		end
+	end)
 end
 
 -- =============================================
@@ -375,9 +441,12 @@ RunService.RenderStepped:Connect(function(dt)
 	end
 
 	if not isCarrying and not isDrinking then
-		hoveringWater = isMouseOverWater()
+		hoveringWater = isMouseOverWater() or isPlayerOnDrinkableTerrain()
 		if hoveringWater then wFrame.Visible = true; wFrame.Position = UDim2.new(0, mouse.X+16, 0, mouse.Y-10) else wFrame.Visible = false end
-	elseif isDrinking then wFrame.Visible = true; if not isMouseOverWater() then cancelDrinking() end
+	elseif isDrinking then
+		wFrame.Visible = true
+		-- Cancel if player moves away from water AND mouse leaves water
+		if not isMouseOverWater() and not isPlayerOnDrinkableTerrain() then cancelDrinking() end
 	else hoveringWater = false; wFrame.Visible = false end
 	if isDrinking then drinkProgress += dt; local r = math.clamp(drinkProgress/DRINK_DURATION,0,1); dBarFill.Size = UDim2.new(r,0,1,0); if r >= 1 then completeDrinking() end end
 end)
