@@ -151,8 +151,50 @@ local function getMouseTerrainPosition()
 end
 
 local function snapToGrid(pos)
+	-- If current building has GridSnap, use that (forced snap regardless of toggle)
+	local cfg = currentBuildingName and BuildingConfig.GetBuilding(currentBuildingName) or nil
+	if cfg and cfg.GridSnap then
+		local g = cfg.GridSnap
+		return Vector3.new(math.round(pos.X/g)*g, pos.Y, math.round(pos.Z/g)*g)
+	end
 	if not gridEnabled then return pos end
 	return Vector3.new(math.round(pos.X/GRID_SIZE)*GRID_SIZE, pos.Y, math.round(pos.Z/GRID_SIZE)*GRID_SIZE)
+end
+
+-- Endpoint snap: if a same-type plot exists adjacent (±gridSnap), snap ghost to extend the road
+local function endpointSnap(pos, buildingName)
+	local cfg = BuildingConfig.GetBuilding(buildingName)
+	if not (cfg and cfg.PlotMode == "incremental" and cfg.GridSnap) then return pos end
+	local g = cfg.GridSnap
+	local bf = workspace:FindFirstChild("Buildings"); if not bf then return pos end
+	local TOL = g * 0.6  -- if mouse is within 60% of grid step from an endpoint, snap to next cell
+	local closestExtension = nil
+	local closestDist = TOL
+	for _, b in ipairs(bf:GetChildren()) do
+		local bt = b:FindFirstChild("BuildingType")
+		if bt and bt.Value == buildingName then
+			local bp
+			if b:IsA("Model") and b.PrimaryPart then bp = b.PrimaryPart.Position
+			elseif b:IsA("Model") then bp = b:GetPivot().Position end
+			if bp then
+				-- Check 4 cardinal extensions of this road
+				local exts = {
+					Vector3.new(bp.X + g, bp.Y, bp.Z),
+					Vector3.new(bp.X - g, bp.Y, bp.Z),
+					Vector3.new(bp.X, bp.Y, bp.Z + g),
+					Vector3.new(bp.X, bp.Y, bp.Z - g),
+				}
+				for _, ext in ipairs(exts) do
+					local d = math.sqrt((ext.X-pos.X)^2 + (ext.Z-pos.Z)^2)
+					if d < closestDist then closestDist = d; closestExtension = ext end
+				end
+			end
+		end
+	end
+	if closestExtension then
+		return Vector3.new(closestExtension.X, pos.Y, closestExtension.Z)
+	end
+	return pos
 end
 
 local function isAreaClear(position, buildingName)
@@ -242,7 +284,10 @@ local function updateGhostColor(c) if not ghostModel then return end; for _, p i
 local function updateGhost()
 	if not isPlacing or not ghostModel then return end
 	local hp = getMouseTerrainPosition(); if not hp then canPlace = false; updateGhostColor(INVALID_COLOR); return end
-	hp = snapToGrid(hp); local bo = getGhostBottomOffset()
+	hp = snapToGrid(hp)
+	-- Endpoint snap for incremental roads: pulls ghost to the next cell of an existing road
+	hp = endpointSnap(hp, currentBuildingName)
+	local bo = getGhostBottomOffset()
 	ghostModel:PivotTo(CFrame.new(hp.X, hp.Y+bo, hp.Z) * CFrame.Angles(0, currentRotation, 0))
 	local config = BuildingConfig.GetBuilding(currentBuildingName)
 	if config and config.AllowedTerrain then
@@ -948,18 +993,22 @@ end
 -- =============================================
 local placementGui = nil
 
+local plotCountLabel = nil  -- ref so server response can update it
+
 function showPlacementHUD()
 	if placementGui then placementGui:Destroy() end
 	placementGui = Instance.new("ScreenGui"); placementGui.Name = "PlacementHUD"; placementGui.ResetOnSpawn = false; placementGui.Parent = playerGui
 
+	local config = BuildingConfig.GetBuilding(currentBuildingName)
+	local dn = config and config.DisplayName or currentBuildingName
+	local isIncremental = config and config.PlotMode == "incremental"
+	local hudH = isIncremental and 64 or 48
+
 	local f = Instance.new("CanvasGroup")
-	f.Size = UDim2.new(0, 380, 0, 48); f.Position = UDim2.new(0.5, -190, 1, -75)
+	f.Size = UDim2.new(0, 380, 0, hudH); f.Position = UDim2.new(0.5, -190, 1, -75 - (hudH - 48))
 	f.BackgroundColor3 = C.Panel; f.BorderSizePixel = 0; f.Parent = placementGui
 	Instance.new("UICorner", f).CornerRadius = UDim.new(0, 8)
 	local hudStroke = Instance.new("UIStroke"); hudStroke.Color = C.GoldDim; hudStroke.Thickness = 1; hudStroke.Parent = f
-
-	local config = BuildingConfig.GetBuilding(currentBuildingName)
-	local dn = config and config.DisplayName or currentBuildingName
 
 	local nl = Instance.new("TextLabel")
 	nl.Size = UDim2.new(1, 0, 0, 18); nl.Position = UDim2.new(0, 0, 0, 5)
@@ -969,15 +1018,51 @@ function showPlacementHUD()
 
 	local cl = Instance.new("TextLabel")
 	cl.Size = UDim2.new(1, 0, 0, 14); cl.Position = UDim2.new(0, 0, 0, 24)
-	cl.BackgroundTransparency = 1; cl.Text = "[Click] Place  [R] Rotate  [V] Reset  [X] Cancel"
+	cl.BackgroundTransparency = 1
+	cl.Text = isIncremental and "[Click] Plot  [R] Rotate 90°  [X] Cancel" or "[Click] Place  [R] Rotate  [V] Reset  [X] Cancel"
 	cl.TextColor3 = C.Label; cl.TextSize = 10; cl.Font = Enum.Font.Gotham; cl.Parent = f
 
-	-- Fade in
+	if isIncremental then
+		plotCountLabel = Instance.new("TextLabel")
+		plotCountLabel.Size = UDim2.new(1, 0, 0, 14); plotCountLabel.Position = UDim2.new(0, 0, 0, 42)
+		plotCountLabel.BackgroundTransparency = 1
+		plotCountLabel.Text = "Plots: 0 / " .. tostring(config.MaxUnfinished or 2)
+		plotCountLabel.TextColor3 = C.GoldWarm; plotCountLabel.TextSize = 11; plotCountLabel.Font = Enum.Font.GothamBold
+		plotCountLabel.Parent = f
+	else
+		plotCountLabel = nil
+	end
+
 	f.GroupTransparency = 1
 	TweenService:Create(f, tweenOpen, {GroupTransparency = 0}):Play()
 end
 
-function hidePlacementHUD() if placementGui then placementGui:Destroy(); placementGui = nil end end
+function hidePlacementHUD()
+	if placementGui then placementGui:Destroy(); placementGui = nil end
+	plotCountLabel = nil
+end
+
+-- Listen for server feedback (quota / plotted)
+PlaceBuildingEvent.OnClientEvent:Connect(function(buildingName, status, value)
+	if status == "plotted" and plotCountLabel and currentBuildingName == buildingName then
+		local cfg = BuildingConfig.GetBuilding(buildingName)
+		local maxN = (cfg and cfg.MaxUnfinished) or 2
+		plotCountLabel.Text = "Plots: " .. tostring(value) .. " / " .. tostring(maxN)
+		plotCountLabel.TextColor3 = (value >= maxN) and C.Danger or C.GoldWarm
+	elseif status == "quota" and plotCountLabel then
+		-- Flash the label red briefly
+		plotCountLabel.Text = "Finish your plotted roads first!"
+		plotCountLabel.TextColor3 = C.Danger
+		task.delay(2, function()
+			if plotCountLabel and currentBuildingName then
+				local cfg = BuildingConfig.GetBuilding(currentBuildingName)
+				local maxN = (cfg and cfg.MaxUnfinished) or 2
+				plotCountLabel.Text = "Plots: " .. tostring(value) .. " / " .. tostring(maxN)
+				plotCountLabel.TextColor3 = C.GoldWarm
+			end
+		end)
+	end
+end)
 
 -- =============================================
 -- PLACEMENT FLOW
@@ -992,8 +1077,16 @@ end
 
 local function confirmPlacement()
 	if not isPlacing or not canPlace then return end
-	local hp = getMouseTerrainPosition(); if not hp then return end; hp = snapToGrid(hp)
+	local hp = getMouseTerrainPosition(); if not hp then return end
+	hp = snapToGrid(hp)
+	hp = endpointSnap(hp, currentBuildingName)
+	local cfg = BuildingConfig.GetBuilding(currentBuildingName)
 	PlaceBuildingEvent:FireServer(currentBuildingName, hp, currentRotation)
+	-- Incremental mode: stay in placement, just keep ghost active for chaining
+	if cfg and cfg.PlotMode == "incremental" then
+		canPlace = false  -- brief frame to prevent double-click; updateGhost re-enables
+		return
+	end
 	destroyGhost(); hideGrid(); hideToolbar(); hidePlacementHUD()
 	isPlacing = false; canPlace = false; currentBuildingName = nil
 end
@@ -1010,8 +1103,14 @@ UserInputService.InputBegan:Connect(function(input, gp)
 	if gp then return end
 	if isPlacing then
 		if input.KeyCode == Enum.KeyCode.R then
-			if freeformMode then holdingR = true
-			else currentRotation += SNAP_STEP; if currentRotation >= math.pi*2 then currentRotation = 0 end end
+			local cfg = currentBuildingName and BuildingConfig.GetBuilding(currentBuildingName) or nil
+			local step = (cfg and cfg.RotationStep) or SNAP_STEP
+			if cfg and cfg.RotationStep then
+				-- Forced rotation step (e.g. roads) — ignore freeform
+				currentRotation += step
+				if currentRotation >= math.pi*2 then currentRotation = 0 end
+			elseif freeformMode then holdingR = true
+			else currentRotation += step; if currentRotation >= math.pi*2 then currentRotation = 0 end end
 		end
 		if input.KeyCode == Enum.KeyCode.V then currentRotation = 0 end
 		if input.KeyCode == Enum.KeyCode.T then freeformMode = not freeformMode; updateToolbarUI() end

@@ -33,6 +33,34 @@ if not buildingsFolder then
 	buildingsFolder.Name = "Buildings"; buildingsFolder.Parent = workspace
 end
 
+-- Folder for road connector parts (small bridges between adjacent road tiles)
+local connectorsFolder = workspace:FindFirstChild("RoadConnectors")
+if not connectorsFolder then
+	connectorsFolder = Instance.new("Folder")
+	connectorsFolder.Name = "RoadConnectors"; connectorsFolder.Parent = workspace
+end
+
+-- Per-player count of unfinished plots per PlotMode building
+local playerPlotCounts = {}  -- [userId] = { DirtPath = 2, ... }
+local function getPlotCount(userId, buildingName)
+	local b = playerPlotCounts[userId]; if not b then return 0 end
+	return b[buildingName] or 0
+end
+local function incPlotCount(userId, buildingName)
+	playerPlotCounts[userId] = playerPlotCounts[userId] or {}
+	playerPlotCounts[userId][buildingName] = (playerPlotCounts[userId][buildingName] or 0) + 1
+end
+local function decPlotCount(userId, buildingName)
+	if not playerPlotCounts[userId] then return end
+	local v = playerPlotCounts[userId][buildingName]
+	if v then playerPlotCounts[userId][buildingName] = math.max(0, v - 1) end
+end
+
+-- Cleanup on player leave
+game:GetService("Players").PlayerRemoving:Connect(function(p)
+	playerPlotCounts[p.UserId] = nil
+end)
+
 local function getBottomOffset(model)
 	local lowestY = math.huge
 	for _, part in ipairs(model:GetDescendants()) do
@@ -232,6 +260,125 @@ local function createBlueprint(buildingName, position, rotation, playerObj)
 	return model
 end
 
+-- ====== ROAD HELPERS ======
+local function getBuildingPosition(b)
+	if b:IsA("Model") and b.PrimaryPart then return b.PrimaryPart.Position end
+	if b:IsA("Model") then return b:GetPivot().Position end
+	if b:IsA("BasePart") then return b.Position end
+	return nil
+end
+
+local function hasRoadAt(position, buildingName)
+	local TOL = 1.5
+	for _, b in ipairs(buildingsFolder:GetChildren()) do
+		local bt = b:FindFirstChild("BuildingType")
+		if bt and bt.Value == buildingName then
+			local p = getBuildingPosition(b)
+			if p and math.abs(p.X - position.X) < TOL and math.abs(p.Z - position.Z) < TOL then
+				return true
+			end
+		end
+	end
+	return false
+end
+
+local function findAdjacentRoads(position, buildingName, gridSnap)
+	-- Returns list of {direction = Vector3, neighbor = Model} for any same-type roads at ±gridSnap on X/Z
+	local TOL = 1.5
+	local found = {}
+	local dirs = {
+		Vector3.new(gridSnap, 0, 0),
+		Vector3.new(-gridSnap, 0, 0),
+		Vector3.new(0, 0, gridSnap),
+		Vector3.new(0, 0, -gridSnap),
+	}
+	for _, dir in ipairs(dirs) do
+		local target = position + dir
+		for _, b in ipairs(buildingsFolder:GetChildren()) do
+			local bt = b:FindFirstChild("BuildingType")
+			if bt and bt.Value == buildingName then
+				local p = getBuildingPosition(b)
+				if p and math.abs(p.X - target.X) < TOL and math.abs(p.Z - target.Z) < TOL then
+					table.insert(found, {dir = dir, neighbor = b})
+					break
+				end
+			end
+		end
+	end
+	return found
+end
+
+function spawnRoadConnectors(roadModel, position, buildingName)
+	local config = BuildingConfig.GetBuilding(buildingName)
+	if not (config and config.GridSnap) then return end
+	local roadId = tostring(roadModel:GetDebugId())
+	local idVal = Instance.new("StringValue"); idVal.Name = "RoadId"; idVal.Value = roadId; idVal.Parent = roadModel
+
+	local neighbors = findAdjacentRoads(position, buildingName, config.GridSnap)
+	for _, info in ipairs(neighbors) do
+		local neighbor = info.neighbor
+		local nId = neighbor:FindFirstChild("RoadId")
+		local nIdValue = nId and nId.Value or "unknown"
+		-- Connector at midpoint
+		local nPos = getBuildingPosition(neighbor)
+		if not nPos then continue end
+		local mid = (position + nPos) / 2
+		-- Skip if connector already exists between this pair
+		local pairTag = roadId < nIdValue and (roadId .. "|" .. nIdValue) or (nIdValue .. "|" .. roadId)
+		local exists = false
+		for _, c in ipairs(connectorsFolder:GetChildren()) do
+			local pt = c:FindFirstChild("PairTag")
+			if pt and pt.Value == pairTag then exists = true; break end
+		end
+		if not exists then
+			local connector = Instance.new("Part")
+			connector.Name = "RoadConnector"
+			connector.Size = Vector3.new(4, config.FootprintY or 0.4, 4)
+			connector.Position = Vector3.new(mid.X, position.Y, mid.Z)
+			connector.Anchored = true; connector.CanCollide = false; connector.CastShadow = false
+			connector.Material = Enum.Material.Slate
+			connector.Color = Color3.fromRGB(110, 85, 60)
+			connector.Transparency = 0.5  -- semi-transparent until both ends are filled
+			connector.Parent = connectorsFolder
+			local tag = Instance.new("StringValue"); tag.Name = "PairTag"; tag.Value = pairTag; tag.Parent = connector
+			local r1 = Instance.new("StringValue"); r1.Name = "RoadA"; r1.Value = roadId; r1.Parent = connector
+			local r2 = Instance.new("StringValue"); r2.Name = "RoadB"; r2.Value = nIdValue; r2.Parent = connector
+		end
+	end
+end
+
+local function updateConnectorOpacity(roadId, completed)
+	-- When a road completes, set its connectors to fully opaque if both ends are now complete
+	for _, c in ipairs(connectorsFolder:GetChildren()) do
+		local rA = c:FindFirstChild("RoadA"); local rB = c:FindFirstChild("RoadB")
+		if rA and rB and (rA.Value == roadId or rB.Value == roadId) then
+			-- Find both road models and check completion status
+			local function isComplete(rid)
+				for _, b in ipairs(buildingsFolder:GetChildren()) do
+					local idV = b:FindFirstChild("RoadId")
+					if idV and idV.Value == rid then
+						local status = b:FindFirstChild("BlueprintStatus")
+						return status == nil  -- no BlueprintStatus = completed
+					end
+				end
+				return false
+			end
+			if isComplete(rA.Value) and isComplete(rB.Value) then
+				c.Transparency = 0
+			end
+		end
+	end
+end
+
+local function destroyConnectorsFor(roadId)
+	for _, c in ipairs(connectorsFolder:GetChildren()) do
+		local rA = c:FindFirstChild("RoadA"); local rB = c:FindFirstChild("RoadB")
+		if rA and rB and (rA.Value == roadId or rB.Value == roadId) then
+			c:Destroy()
+		end
+	end
+end
+
 local function isBlueprintComplete(bp)
 	local pf = bp:FindFirstChild("ResourceProgress"); if not pf then return true end
 	local resources = {}
@@ -256,9 +403,12 @@ local function finishBlueprint(bp)
 	local groundPos = (bp:FindFirstChild("GroundPosition") or {}).Value or bp:GetPivot().Position
 	local ownerName = (bp:FindFirstChild("Owner") or {}).Value or "Unknown"
 	local ownerId = (bp:FindFirstChild("OwnerId") or {}).Value or 0
+	local roadId = (bp:FindFirstChild("RoadId") or {}).Value
+	local isIncremental = config.PlotMode == "incremental"
 	playSoundOnModel(bp, SOUNDS.BuildComplete, 1.0)
 	task.wait(0.3)
 	bp:Destroy()
+
 	local model = nil
 	local template = getModelTemplate(buildingName)
 	if template then
@@ -268,6 +418,14 @@ local function finishBlueprint(bp)
 				if p:IsA("BasePart") then model.PrimaryPart = p; break end
 			end
 		end
+	elseif isIncremental then
+		-- Roads: simple flat dirt slab
+		model = Instance.new("Model"); model.Name = buildingName
+		local body = Instance.new("Part"); body.Name = "Base"
+		body.Size = Vector3.new(config.FootprintX, config.FootprintY or 0.4, config.FootprintZ)
+		body.Material = Enum.Material.Slate
+		body.Color = Color3.fromRGB(110, 85, 60)
+		body.Parent = model; model.PrimaryPart = body
 	else
 		model = Instance.new("Model"); model.Name = buildingName
 		local body = Instance.new("Part"); body.Name = "Base"
@@ -280,7 +438,15 @@ local function finishBlueprint(bp)
 	Instance.new("StringValue", model).Name = "BuildingType"; model.BuildingType.Value = buildingName
 	Instance.new("StringValue", model).Name = "Owner"; model.Owner.Value = ownerName
 	Instance.new("IntValue", model).Name = "OwnerId"; model.OwnerId.Value = ownerId
+	if roadId then
+		local idVal = Instance.new("StringValue"); idVal.Name = "RoadId"; idVal.Value = roadId; idVal.Parent = model
+	end
 	model.Parent = buildingsFolder
+
+	if isIncremental then
+		decPlotCount(ownerId, buildingName)
+		if roadId then updateConnectorOpacity(roadId, true) end
+	end
 	print(string.format("[BUILD] Blueprint completed: %s by %s", config.DisplayName, ownerName))
 end
 
@@ -298,6 +464,25 @@ PlaceBuildingEvent.OnServerEvent:Connect(function(playerObj, buildingName, posit
 	local character = playerObj.Character; if not character then return end
 	local root = character:FindFirstChild("HumanoidRootPart"); if not root then return end
 	if (root.Position - position).Magnitude > PLACE_RANGE then return end
+
+	-- PlotMode "incremental" — quota check, skip area check (roads are flat), allow overlapping check disabled
+	local isIncremental = config.PlotMode == "incremental"
+	if isIncremental then
+		if config.MaxUnfinished and getPlotCount(playerObj.UserId, buildingName) >= config.MaxUnfinished then
+			-- Send feedback to client via PlaceBuildingEvent return channel
+			PlaceBuildingEvent:FireClient(playerObj, buildingName, "quota", config.MaxUnfinished)
+			return
+		end
+		-- Snap position to GridSnap and rotation to RotationStep
+		if config.GridSnap then
+			local g = config.GridSnap
+			position = Vector3.new(math.round(position.X/g)*g, position.Y, math.round(position.Z/g)*g)
+		end
+		if config.RotationStep then
+			rotation = math.round(rotation / config.RotationStep) * config.RotationStep
+		end
+	end
+
 	if config.AllowedTerrain then
 		local terrainType = TerrainIdentifier.GetTerrainAtPosition(position)
 		if not terrainType then return end
@@ -306,12 +491,25 @@ PlaceBuildingEvent.OnServerEvent:Connect(function(playerObj, buildingName, posit
 			if t == terrainType then allowed = true; break end
 		end
 		if not allowed then return end
-	else
+	elseif not isIncremental then
+		-- Skip footprint check for incremental (flat roads can sit on uneven ground)
 		local footprint = Vector3.new(config.FootprintX, 0, config.FootprintZ)
 		if not TerrainIdentifier.CheckBuildingArea(position, footprint, rotation) then return end
 	end
-	if not isAreaClear(position, config, character) then return end
-	createBlueprint(buildingName, position, rotation, playerObj)
+
+	if not isIncremental then
+		if not isAreaClear(position, config, character) then return end
+	else
+		-- For roads, allow overlap with existing roads (player retried same tile = no-op)
+		if hasRoadAt(position, buildingName) then return end
+	end
+
+	local bp = createBlueprint(buildingName, position, rotation, playerObj)
+	if isIncremental and bp then
+		incPlotCount(playerObj.UserId, buildingName)
+		spawnRoadConnectors(bp, position, buildingName)
+		PlaceBuildingEvent:FireClient(playerObj, buildingName, "plotted", getPlotCount(playerObj.UserId, buildingName))
+	end
 end)
 
 InsertResourceEvent.OnServerEvent:Connect(function(playerObj)

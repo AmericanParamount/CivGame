@@ -39,6 +39,15 @@ BuildingConfig.Buildings = {
 	Torch = { DisplayName = "Torch", Description = "A standing torch. Lights up the area at night.", Category = "Decorations", FootprintX = 2, FootprintZ = 2, FootprintY = 5, Cost = { Log = 1 } },
 	Dock = { DisplayName = "Dock", Description = "A wooden platform over water.", Category = "Misc", FootprintX = 8, FootprintZ = 12, FootprintY = 3, AllowedTerrain = { "SandyShore", "Riverbank" }, Cost = { Log = 5 }, MinAge = 16 },
 	Bridge = { DisplayName = "Bridge", Description = "A wooden crossing over water or gaps.", Category = "Misc", FootprintX = 4, FootprintZ = 12, FootprintY = 2, Cost = { Log = 4, Stone = 2 }, MinAge = 14 },
+	DirtPath = {
+		DisplayName = "Dirt Path", Description = "A simple footpath. Plot multiple, fill with logs.",
+		Category = "Decorations", FootprintX = 8, FootprintZ = 8, FootprintY = 0.4,
+		Cost = { Log = 1 },
+		PlotMode = "incremental",   -- triggers special placement flow
+		GridSnap = 8,               -- forces 8-stud snap regardless of grid toggle
+		RotationStep = math.pi/2,   -- 90° rotation only
+		MaxUnfinished = 2,          -- max plotted-but-unfilled per player
+	},
 }
 
 function BuildingConfig.GetBuilding(buildingName) return BuildingConfig.Buildings[buildingName] end
