@@ -180,16 +180,6 @@ local RESOURCE_NODES = {
 		Drops = { { Type = "inventory", Item = "Fish", Min = 1, Max = 2 } },
 		RespawnTime = 120,
 	},
-	FlintNode = {
-		MaxHealth = 1, HitCooldown = 0.5, HandDamage = 1,
-		Drops = { { Type = "inventory", Item = "Flint", Min = 1, Max = 3 } },
-		RespawnTime = 150,
-	},
-	RiverClayBank = {
-		MaxHealth = 2, HitCooldown = 0.6, HandDamage = 1,
-		Drops = { { Type = "inventory", Item = "RiverClay", Min = 2, Max = 4 } },
-		RespawnTime = 180,
-	},
 }
 
 local nodeStates = {}

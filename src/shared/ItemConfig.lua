@@ -4,35 +4,11 @@
 local ItemConfig = {}
 ItemConfig.Items = {
 	-- === RESOURCES ===
-	Wood = {
-		DisplayName = "Wood",
-		Category = "Resource",
-		MaxStack = 1,
-		Description = "Basic building material from trees",
-	},
 	Stone = {
 		DisplayName = "Stone",
 		Category = "Resource",
 		MaxStack = 1,
 		Description = "Hard building material from rocks",
-	},
-	Clay = {
-		DisplayName = "Clay",
-		Category = "Resource",
-		MaxStack = 1,
-		Description = "Soft material for pottery and bricks",
-	},
-	Iron = {
-		DisplayName = "Iron Ore",
-		Category = "Resource",
-		MaxStack = 1,
-		Description = "Raw metal ore for smelting",
-	},
-	Copper = {
-		DisplayName = "Copper Ore",
-		Category = "Resource",
-		MaxStack = 1,
-		Description = "Raw copper ore for bronze making",
 	},
 	Reeds = {
 		DisplayName = "Reeds",
@@ -69,22 +45,6 @@ ItemConfig.Items = {
 		ThirstRestore = 0,
 		Description = "Forest mushrooms",
 	},
-	RawMeat = {
-		DisplayName = "Raw Meat",
-		Category = "Food",
-		MaxStack = 1,
-		HungerRestore = 8,
-		ThirstRestore = 0,
-		Description = "Uncooked meat, not very nourishing",
-	},
-	CookedMeat = {
-		DisplayName = "Cooked Meat",
-		Category = "Food",
-		MaxStack = 1,
-		HungerRestore = 35,
-		ThirstRestore = 0,
-		Description = "Well cooked meat, very filling",
-	},
 	Fish = {
 		DisplayName = "Fish",
 		Category = "Food",
@@ -101,34 +61,6 @@ ItemConfig.Items = {
 		ThirstRestore = 0,
 		HealthRestore = 10,
 		Description = "Medicinal herbs, restores health",
-	},
-	-- === TOOLS ===
-	StoneAxe = {
-		DisplayName = "Stone Axe",
-		Category = "Tool",
-		MaxStack = 1,
-		ToolType = "Axe",
-		GatherSpeed = 1.5,
-		Durability = 50,
-		Description = "A crude axe for chopping trees",
-	},
-	StonePickaxe = {
-		DisplayName = "Stone Pickaxe",
-		Category = "Tool",
-		MaxStack = 1,
-		ToolType = "Pickaxe",
-		GatherSpeed = 1.5,
-		Durability = 50,
-		Description = "A crude pickaxe for mining stone",
-	},
-	WoodSpear = {
-		DisplayName = "Wooden Spear",
-		Category = "Tool",
-		MaxStack = 1,
-		ToolType = "Weapon",
-		Damage = 15,
-		Durability = 30,
-		Description = "A sharpened wooden spear",
 	},
 }
 function ItemConfig.GetItem(itemName: string)

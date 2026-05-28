@@ -37,6 +37,12 @@ end
 
 local function applyScale(player, age)
 	local character = player.Character; if not character then return end
+	local ageValue = character:FindFirstChild("Age")
+	if not ageValue or not ageValue:IsA("IntValue") then
+		if ageValue then ageValue:Destroy() end
+		ageValue = Instance.new("IntValue"); ageValue.Name = "Age"; ageValue.Parent = character
+	end
+	ageValue.Value = math.floor(age)
 	local agingConfig = CharacterConfig.Aging
 	local scalingConfig = CharacterConfig.Scaling
 	local scale

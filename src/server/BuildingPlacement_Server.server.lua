@@ -16,6 +16,13 @@ local InsertResourceEvent = Instance.new("RemoteEvent")
 InsertResourceEvent.Name = "InsertResourceIntoBlueprint"
 InsertResourceEvent.Parent = Events
 
+local PlaceRoadSegmentEvent = Events:FindFirstChild("PlaceRoadSegment")
+if not PlaceRoadSegmentEvent then
+	PlaceRoadSegmentEvent = Instance.new("RemoteEvent")
+	PlaceRoadSegmentEvent.Name = "PlaceRoadSegment"
+	PlaceRoadSegmentEvent.Parent = Events
+end
+
 local PLACE_RANGE = 30
 local INSERT_RANGE = BuildingConfig.INSERT_RANGE
 local BLUEPRINT_TRANSPARENCY = 0.7
@@ -41,7 +48,7 @@ if not connectorsFolder then
 end
 
 -- Per-player count of unfinished plots per PlotMode building
-local playerPlotCounts = {}  -- [userId] = { DirtPath = 2, ... }
+local playerPlotCounts = {}
 local function getPlotCount(userId, buildingName)
 	local b = playerPlotCounts[userId]; if not b then return 0 end
 	return b[buildingName] or 0
@@ -56,7 +63,6 @@ local function decPlotCount(userId, buildingName)
 	if v then playerPlotCounts[userId][buildingName] = math.max(0, v - 1) end
 end
 
--- Cleanup on player leave
 game:GetService("Players").PlayerRemoving:Connect(function(p)
 	playerPlotCounts[p.UserId] = nil
 end)
@@ -131,7 +137,7 @@ local function getPlayerAge(playerObj)
 	local ageVal = character:FindFirstChild("Age")
 	if ageVal and ageVal:IsA("IntValue") then return ageVal.Value end
 	if ageVal and ageVal:IsA("NumberValue") then return math.floor(ageVal.Value) end
-	return 99
+	return 0
 end
 
 local function getPlayerRole(playerObj)
@@ -283,7 +289,6 @@ local function hasRoadAt(position, buildingName)
 end
 
 local function findAdjacentRoads(position, buildingName, gridSnap)
-	-- Returns list of {direction = Vector3, neighbor = Model} for any same-type roads at ±gridSnap on X/Z
 	local TOL = 1.5
 	local found = {}
 	local dirs = {
@@ -319,11 +324,9 @@ function spawnRoadConnectors(roadModel, position, buildingName)
 		local neighbor = info.neighbor
 		local nId = neighbor:FindFirstChild("RoadId")
 		local nIdValue = nId and nId.Value or "unknown"
-		-- Connector at midpoint
 		local nPos = getBuildingPosition(neighbor)
 		if not nPos then continue end
 		local mid = (position + nPos) / 2
-		-- Skip if connector already exists between this pair
 		local pairTag = roadId < nIdValue and (roadId .. "|" .. nIdValue) or (nIdValue .. "|" .. roadId)
 		local exists = false
 		for _, c in ipairs(connectorsFolder:GetChildren()) do
@@ -338,7 +341,7 @@ function spawnRoadConnectors(roadModel, position, buildingName)
 			connector.Anchored = true; connector.CanCollide = false; connector.CastShadow = false
 			connector.Material = Enum.Material.Slate
 			connector.Color = Color3.fromRGB(110, 85, 60)
-			connector.Transparency = 0.5  -- semi-transparent until both ends are filled
+			connector.Transparency = 0.5
 			connector.Parent = connectorsFolder
 			local tag = Instance.new("StringValue"); tag.Name = "PairTag"; tag.Value = pairTag; tag.Parent = connector
 			local r1 = Instance.new("StringValue"); r1.Name = "RoadA"; r1.Value = roadId; r1.Parent = connector
@@ -347,18 +350,16 @@ function spawnRoadConnectors(roadModel, position, buildingName)
 	end
 end
 
-local function updateConnectorOpacity(roadId, completed)
-	-- When a road completes, set its connectors to fully opaque if both ends are now complete
+local function updateConnectorOpacity(roadId)
 	for _, c in ipairs(connectorsFolder:GetChildren()) do
 		local rA = c:FindFirstChild("RoadA"); local rB = c:FindFirstChild("RoadB")
 		if rA and rB and (rA.Value == roadId or rB.Value == roadId) then
-			-- Find both road models and check completion status
 			local function isComplete(rid)
 				for _, b in ipairs(buildingsFolder:GetChildren()) do
 					local idV = b:FindFirstChild("RoadId")
 					if idV and idV.Value == rid then
 						local status = b:FindFirstChild("BlueprintStatus")
-						return status == nil  -- no BlueprintStatus = completed
+						return status == nil
 					end
 				end
 				return false
@@ -366,15 +367,6 @@ local function updateConnectorOpacity(roadId, completed)
 			if isComplete(rA.Value) and isComplete(rB.Value) then
 				c.Transparency = 0
 			end
-		end
-	end
-end
-
-local function destroyConnectorsFor(roadId)
-	for _, c in ipairs(connectorsFolder:GetChildren()) do
-		local rA = c:FindFirstChild("RoadA"); local rB = c:FindFirstChild("RoadB")
-		if rA and rB and (rA.Value == roadId or rB.Value == roadId) then
-			c:Destroy()
 		end
 	end
 end
@@ -405,6 +397,11 @@ local function finishBlueprint(bp)
 	local ownerId = (bp:FindFirstChild("OwnerId") or {}).Value or 0
 	local roadId = (bp:FindFirstChild("RoadId") or {}).Value
 	local isIncremental = config.PlotMode == "incremental"
+	local isRoadSegment = config.IsRoad == true
+	local startPosV = bp:FindFirstChild("StartPos")
+	local endPosV = bp:FindFirstChild("EndPos")
+	local segStart = startPosV and startPosV.Value or nil
+	local segEnd = endPosV and endPosV.Value or nil
 	playSoundOnModel(bp, SOUNDS.BuildComplete, 1.0)
 	task.wait(0.3)
 	bp:Destroy()
@@ -418,8 +415,21 @@ local function finishBlueprint(bp)
 				if p:IsA("BasePart") then model.PrimaryPart = p; break end
 			end
 		end
+	elseif isRoadSegment and segStart and segEnd then
+		-- Road segment: stretched part between two points
+		model = Instance.new("Model"); model.Name = buildingName
+		local body = Instance.new("Part"); body.Name = "Base"
+		local width = config.RoadWidth or 4
+		local height = config.RoadHeight or 0.3
+		local length = (segEnd - segStart).Magnitude
+		body.Size = Vector3.new(width, height, length)
+		local mid = (segStart + segEnd) * 0.5
+		body.CFrame = CFrame.lookAt(mid, segEnd)
+		body.Material = Enum.Material.Slate
+		body.Color = Color3.fromRGB(110, 85, 60)
+		body.Anchored = true; body.CanCollide = true; body.CastShadow = false
+		body.Parent = model; model.PrimaryPart = body
 	elseif isIncremental then
-		-- Roads: simple flat dirt slab
 		model = Instance.new("Model"); model.Name = buildingName
 		local body = Instance.new("Part"); body.Name = "Base"
 		body.Size = Vector3.new(config.FootprintX, config.FootprintY or 0.4, config.FootprintZ)
@@ -434,18 +444,22 @@ local function finishBlueprint(bp)
 		body.Parent = model; model.PrimaryPart = body
 	end
 	anchorAndCollide(model)
-	placeOnGround(model, groundPos.X, groundPos.Y, groundPos.Z, rotation)
+	if not (isRoadSegment and segStart and segEnd) then
+		placeOnGround(model, groundPos.X, groundPos.Y, groundPos.Z, rotation)
+	end
 	Instance.new("StringValue", model).Name = "BuildingType"; model.BuildingType.Value = buildingName
 	Instance.new("StringValue", model).Name = "Owner"; model.Owner.Value = ownerName
 	Instance.new("IntValue", model).Name = "OwnerId"; model.OwnerId.Value = ownerId
+	if segStart then local sv = Instance.new("Vector3Value"); sv.Name = "StartPos"; sv.Value = segStart; sv.Parent = model end
+	if segEnd then local ev = Instance.new("Vector3Value"); ev.Name = "EndPos"; ev.Value = segEnd; ev.Parent = model end
 	if roadId then
 		local idVal = Instance.new("StringValue"); idVal.Name = "RoadId"; idVal.Value = roadId; idVal.Parent = model
 	end
 	model.Parent = buildingsFolder
 
-	if isIncremental then
+	if isIncremental or isRoadSegment then
 		decPlotCount(ownerId, buildingName)
-		if roadId then updateConnectorOpacity(roadId, true) end
+		if roadId then updateConnectorOpacity(roadId) end
 	end
 	print(string.format("[BUILD] Blueprint completed: %s by %s", config.DisplayName, ownerName))
 end
@@ -465,15 +479,12 @@ PlaceBuildingEvent.OnServerEvent:Connect(function(playerObj, buildingName, posit
 	local root = character:FindFirstChild("HumanoidRootPart"); if not root then return end
 	if (root.Position - position).Magnitude > PLACE_RANGE then return end
 
-	-- PlotMode "incremental" — quota check, skip area check (roads are flat), allow overlapping check disabled
 	local isIncremental = config.PlotMode == "incremental"
 	if isIncremental then
 		if config.MaxUnfinished and getPlotCount(playerObj.UserId, buildingName) >= config.MaxUnfinished then
-			-- Send feedback to client via PlaceBuildingEvent return channel
 			PlaceBuildingEvent:FireClient(playerObj, buildingName, "quota", config.MaxUnfinished)
 			return
 		end
-		-- Snap position to GridSnap and rotation to RotationStep
 		if config.GridSnap then
 			local g = config.GridSnap
 			position = Vector3.new(math.round(position.X/g)*g, position.Y, math.round(position.Z/g)*g)
@@ -492,7 +503,6 @@ PlaceBuildingEvent.OnServerEvent:Connect(function(playerObj, buildingName, posit
 		end
 		if not allowed then return end
 	elseif not isIncremental then
-		-- Skip footprint check for incremental (flat roads can sit on uneven ground)
 		local footprint = Vector3.new(config.FootprintX, 0, config.FootprintZ)
 		if not TerrainIdentifier.CheckBuildingArea(position, footprint, rotation) then return end
 	end
@@ -500,7 +510,6 @@ PlaceBuildingEvent.OnServerEvent:Connect(function(playerObj, buildingName, posit
 	if not isIncremental then
 		if not isAreaClear(position, config, character) then return end
 	else
-		-- For roads, allow overlap with existing roads (player retried same tile = no-op)
 		if hasRoadAt(position, buildingName) then return end
 	end
 
@@ -557,6 +566,102 @@ InsertResourceEvent.OnServerEvent:Connect(function(playerObj)
 		task.delay(0.5, function()
 			if nearestBP and nearestBP.Parent then finishBlueprint(nearestBP) end
 		end)
+	end
+end)
+
+-- =============================================
+-- ROAD SEGMENT PLACEMENT (point-to-point)
+-- =============================================
+local function createRoadSegmentBlueprint(buildingName, startPos, endPos, playerObj, logsNeeded)
+	local config = BuildingConfig.GetBuilding(buildingName)
+	if not config then return nil end
+	local width = config.RoadWidth or 4
+	local height = config.RoadHeight or 0.3
+	local length = (endPos - startPos).Magnitude
+	local mid = (startPos + endPos) * 0.5
+
+	local model = Instance.new("Model"); model.Name = buildingName
+	local body = Instance.new("Part"); body.Name = "Base"
+	body.Size = Vector3.new(width, height, length)
+	body.CFrame = CFrame.lookAt(mid, endPos)
+	body.Anchored = true; body.CanCollide = false; body.CastShadow = false
+	body.Material = Enum.Material.SmoothPlastic
+	body.Color = BLUEPRINT_COLOR
+	body.Transparency = BLUEPRINT_TRANSPARENCY
+	body.Parent = model; model.PrimaryPart = body
+
+	Instance.new("StringValue", model).Name = "BuildingType"; model.BuildingType.Value = buildingName
+	Instance.new("StringValue", model).Name = "BlueprintStatus"; model.BlueprintStatus.Value = "InProgress"
+	Instance.new("StringValue", model).Name = "Owner"; model.Owner.Value = playerObj.Name
+	Instance.new("IntValue", model).Name = "OwnerId"; model.OwnerId.Value = playerObj.UserId
+	local sv = Instance.new("Vector3Value"); sv.Name = "StartPos"; sv.Value = startPos; sv.Parent = model
+	local ev = Instance.new("Vector3Value"); ev.Name = "EndPos"; ev.Value = endPos; ev.Parent = model
+	local nv = Instance.new("NumberValue"); nv.Name = "Rotation"; nv.Value = 0; nv.Parent = model
+	local gv = Instance.new("Vector3Value"); gv.Name = "GroundPosition"; gv.Value = mid; gv.Parent = model
+
+	-- ResourceProgress: Log_Current/Log_Needed
+	local pf = Instance.new("Folder"); pf.Name = "ResourceProgress"; pf.Parent = model
+	local cv = Instance.new("IntValue"); cv.Name = "Log_Current"; cv.Value = 0; cv.Parent = pf
+	local nvLog = Instance.new("IntValue"); nvLog.Name = "Log_Needed"; nvLog.Value = logsNeeded; nvLog.Parent = pf
+
+	-- Billboard
+	local bb = Instance.new("BillboardGui")
+	bb.Name = "ProgressBillboard"
+	bb.Size = UDim2.new(0, 200, 0, 50)
+	bb.StudsOffset = Vector3.new(0, 4, 0)
+	bb.AlwaysOnTop = false; bb.MaxDistance = 60; bb.Parent = body
+	local nl = Instance.new("TextLabel"); nl.Name = "NameLabel"
+	nl.Size = UDim2.new(1, 0, 0, 18); nl.BackgroundTransparency = 1
+	nl.Text = config.DisplayName .. " (Blueprint)"
+	nl.TextColor3 = Color3.fromRGB(80, 160, 220); nl.TextStrokeTransparency = 0.3
+	nl.TextSize = 14; nl.Font = Enum.Font.GothamBold; nl.Parent = bb
+	local pl = Instance.new("TextLabel"); pl.Name = "ProgressLabel"
+	pl.Size = UDim2.new(1, 0, 0, 14); pl.Position = UDim2.new(0, 0, 0, 18)
+	pl.BackgroundTransparency = 1; pl.TextColor3 = Color3.fromRGB(200, 190, 170)
+	pl.TextStrokeTransparency = 0.3; pl.TextSize = 12; pl.Font = Enum.Font.Gotham
+	pl.Parent = bb
+	local hl = Instance.new("TextLabel"); hl.Name = "HintLabel"
+	hl.Size = UDim2.new(1, 0, 0, 12); hl.Position = UDim2.new(0, 0, 0, 34)
+	hl.BackgroundTransparency = 1; hl.Text = "[C] Insert Log while carrying"
+	hl.TextColor3 = Color3.fromRGB(150, 145, 135); hl.TextStrokeTransparency = 0.3
+	hl.TextSize = 10; hl.Font = Enum.Font.Gotham; hl.Parent = bb
+
+	model.Parent = buildingsFolder
+	updateBlueprintBillboard(model)
+	playSoundOnModel(model, SOUNDS.BlueprintPlace, 0.5)
+	return model
+end
+
+PlaceRoadSegmentEvent.OnServerEvent:Connect(function(playerObj, buildingName, startPos, endPos)
+	if type(buildingName) ~= "string" then return end
+	if typeof(startPos) ~= "Vector3" or typeof(endPos) ~= "Vector3" then return end
+	local config = BuildingConfig.GetBuilding(buildingName)
+	if not config or not config.IsRoad then return end
+	if not canPlayerBuild(playerObj, buildingName) then return end
+
+	local character = playerObj.Character; if not character then return end
+	local root = character:FindFirstChild("HumanoidRootPart"); if not root then return end
+	if (root.Position - startPos).Magnitude > PLACE_RANGE then return end
+
+	local length = (endPos - startPos).Magnitude
+	local maxLen = config.MaxSegmentLength or 60
+	if length < 1 or length > maxLen then return end
+
+	-- Quota check
+	if config.MaxUnfinished and getPlotCount(playerObj.UserId, buildingName) >= config.MaxUnfinished then
+		PlaceRoadSegmentEvent:FireClient(playerObj, buildingName, "quota", config.MaxUnfinished)
+		return
+	end
+
+	-- Cost: 1 log per (1/LogsPerStud) studs, rounded up. Default LogsPerStud=0.125 → 1 log/8 studs.
+	local logsPerStud = config.LogsPerStud or 0.125
+	local logsNeeded = math.max(1, math.ceil(length * logsPerStud))
+
+	local bp = createRoadSegmentBlueprint(buildingName, startPos, endPos, playerObj, logsNeeded)
+	if bp then
+		incPlotCount(playerObj.UserId, buildingName)
+		print(string.format("[ROAD] %s plotted %s segment (%.1f studs, %d logs)", playerObj.Name, config.DisplayName, length, logsNeeded))
+		PlaceRoadSegmentEvent:FireClient(playerObj, buildingName, "plotted", getPlotCount(playerObj.UserId, buildingName), logsNeeded)
 	end
 end)
 
